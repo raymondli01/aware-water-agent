@@ -6,9 +6,17 @@ from ai_agents.supabase_client import supabase_client
 app = fastapi.FastAPI(title="AWARE Water Management System API")
 
 # Middleware Configuration
+import os
+
+# Get allowed origins from environment variable or use defaults
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000"
+).split(",")
+
 app.add_middleware(
     fastapi.middleware.cors.CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -230,8 +238,11 @@ async def get_network_topology():
             if len(leak_indicators) > 0:
                 leak_indicator_count += 1
 
-            # Filter active incidents (not resolved)
+            # Filter incidents by state
             active_incidents = [inc for inc in edge_incidents if inc["state"] != "resolved"]
+            open_incidents = [inc for inc in edge_incidents if inc["state"] == "open"]
+            acknowledged_incidents = [inc for inc in edge_incidents if inc["state"] == "acknowledged"]
+            resolved_incidents = [inc for inc in edge_incidents if inc["state"] == "resolved"]
 
             # Get highest priority incident (for reference)
             highest_priority_incident = None
@@ -252,6 +263,8 @@ async def get_network_topology():
                 },
                 "active_incident_count": len(active_incidents),
                 "total_incident_count": len(edge_incidents),
+                "has_open_incidents": len(open_incidents) > 0,
+                "has_acknowledged_incidents": len(acknowledged_incidents) > 0,
                 "highest_priority_incident": highest_priority_incident,
                 "all_incidents": edge_incidents
             })
