@@ -2,6 +2,7 @@ import fastapi
 import fastapi.middleware.cors
 from ai_agents import AgentCoordinator, AnalyticsAgent
 from ai_agents.supabase_client import supabase_client
+import constants as c
 
 app = fastapi.FastAPI(title="AWARE Water Management System API")
 
@@ -45,6 +46,132 @@ async def get_sensors():
         return {"sensors": sensors, "count": len(sensors)}
     except Exception as e:
         return {"error": str(e), "sensors": []}
+
+
+@app.post("/sensors/refresh")
+async def refresh_sensors():
+    """
+    Refresh all sensors to have the current timestamp and slightly jittered values.
+    """
+    try:
+        import random
+        
+        # Fetch all sensors
+        sensors = await supabase_client.query("sensors", select="*")
+        
+        count = 0
+        for sensor in sensors:
+            sensor_id = sensor["id"]
+            current_value = sensor["value"]
+            sensor_type = sensor["type"]
+            
+            # Add slight jitter to values
+            if current_value is not None:
+                if sensor_type == "pressure":
+                    new_value = current_value + random.uniform(-0.5, 0.5)
+                elif sensor_type == "flow":
+                    new_value = current_value + random.uniform(-1.0, 1.0)
+                elif sensor_type == "acoustic":
+                    new_value = current_value + random.uniform(-0.1, 0.1)
+                else:
+                    new_value = current_value
+                    
+                if new_value < 0: new_value = 0
+            else:
+                new_value = None
+
+            # Update sensor
+            await supabase_client.update(
+                "sensors",
+                {"value": new_value, "last_seen": "now()"},
+                id=f"eq.{sensor_id}"
+            )
+            count += 1
+            
+        return {"status": "success", "message": f"Refreshed {count} sensors"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+async def update_edge_sensors(edge_id: str, get_value_fn):
+    """
+    Helper to update all sensors for a given edge using a value generation function.
+    """
+    try:
+        # Fetch sensors for this edge
+        sensors = await supabase_client.query(
+            "sensors", 
+            select="*",
+            asset_type="eq.edge",
+            asset_id=f"eq.{edge_id}"
+        )
+        
+        count = 0
+        for sensor in sensors:
+            sensor_id = sensor["id"]
+            sensor_type = sensor["type"]
+            
+            new_value = get_value_fn(sensor_type)
+            if new_value is None:
+                continue
+
+            # Update sensor
+            await supabase_client.update(
+                "sensors",
+                {"value": new_value, "last_seen": "now()"},
+                id=f"eq.{sensor_id}"
+            )
+            count += 1
+            
+        return count
+    except Exception as e:
+        raise e
+
+@app.post("/sensors/reset/{edge_id}")
+async def reset_sensors_for_edge(edge_id: str):
+    """
+    Reset sensors for a specific edge to normal values.
+    Used when an incident is resolved.
+    """
+    try:
+        import random
+        
+        def get_normal_value(sensor_type):
+            if sensor_type == "pressure":
+                return random.uniform(c.PRESSURE_NORMAL_MIN, c.PRESSURE_NORMAL_MAX)
+            elif sensor_type == "acoustic":
+                return random.uniform(c.ACOUSTIC_NORMAL_MIN, c.ACOUSTIC_NORMAL_MAX)
+            elif sensor_type == "flow":
+                return random.uniform(c.FLOW_NORMAL_MIN, c.FLOW_NORMAL_MAX)
+            return None
+
+        count = await update_edge_sensors(edge_id, get_normal_value)
+        return {"status": "success", "message": f"Reset {count} sensors for edge {edge_id}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/sensors/simulate-leak/{edge_id}")
+async def simulate_leak(edge_id: str):
+    """
+    Simulate a leak on a specific edge by setting sensors to critical values.
+    """
+    try:
+        import random
+        
+        def get_leak_value(sensor_type):
+            if sensor_type == "pressure":
+                return random.uniform(c.PRESSURE_LEAK_MIN, c.PRESSURE_LEAK_MAX)
+            elif sensor_type == "acoustic":
+                return random.uniform(c.ACOUSTIC_LEAK_MIN, c.ACOUSTIC_LEAK_MAX)
+            elif sensor_type == "flow":
+                return random.uniform(c.FLOW_LEAK_MIN, c.FLOW_LEAK_MAX)
+            return None
+
+        count = await update_edge_sensors(edge_id, get_leak_value)
+        return {"status": "success", "message": f"Simulated leak on edge {edge_id}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 # Legacy Leak Detection (simple rule-based)
@@ -218,11 +345,11 @@ async def get_network_topology():
 
             # Determine leak indicators from sensor data
             leak_indicators = []
-            if pressure is not None and pressure < 55:
+            if pressure is not None and pressure < c.PRESSURE_LOW_THRESHOLD:
                 leak_indicators.append("LOW_PRESSURE")
-            if acoustic is not None and acoustic > 5:
+            if acoustic is not None and acoustic > c.ACOUSTIC_HIGH_THRESHOLD:
                 leak_indicators.append("HIGH_ACOUSTIC")
-            if flow is not None and flow > 110:
+            if flow is not None and flow > c.FLOW_HIGH_THRESHOLD:
                 leak_indicators.append("HIGH_FLOW")
 
             # Determine edge status based on sensor data

@@ -48,7 +48,7 @@ const Incidents = () => {
   });
 
   const updateEventMutation = useMutation({
-    mutationFn: async ({ id, state }: { id: string; state: 'open' | 'acknowledged' | 'resolved' }) => {
+    mutationFn: async ({ id, state, edgeId }: { id: string; state: 'open' | 'acknowledged' | 'resolved'; edgeId?: string }) => {
       const { data, error } = await supabase
         .from('events')
         .update({ state })
@@ -57,6 +57,21 @@ const Incidents = () => {
         .single();
 
       if (error) throw error;
+
+      // If resolving, also reset sensors for this edge
+      if (state === 'resolved' && edgeId) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        try {
+          await fetch(`${API_URL}/sensors/reset/${edgeId}`, {
+            method: 'POST',
+          });
+          toast.success('Sensors reset to normal levels');
+        } catch (err) {
+          console.error('Failed to reset sensors:', err);
+          toast.error('Event resolved, but failed to reset sensors');
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -333,7 +348,11 @@ const Incidents = () => {
                   size="sm"
                   variant="default"
                   onClick={() =>
-                    updateEventMutation.mutate({ id: event.id, state: 'resolved' })
+                    updateEventMutation.mutate({ 
+                      id: event.id, 
+                      state: 'resolved',
+                      edgeId: event.asset_ref 
+                    })
                   }
                   disabled={updateEventMutation.isPending}
                 >
