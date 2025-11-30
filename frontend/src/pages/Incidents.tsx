@@ -12,6 +12,15 @@ const Incidents = () => {
   const [expandedIncident, setExpandedIncident] = useState<string | null>(null);
   const [showResolvedIncidents, setShowResolvedIncidents] = useState(false);
 
+  // Image mapping for incident types
+  const incidentImages: Record<string, string> = {
+    leak: '/assets/incidents/leak.jpg',
+    quality: '/assets/incidents/quality.jpg',
+    energy: '/assets/incidents/energy.jpg',
+    maintenance: '/assets/incidents/maintenance.jpg',
+    default: '/assets/incidents/maintenance.jpg', // Fallback
+  };
+
   // Fetch edges for name lookup
   const { data: edges } = useQuery({
     queryKey: ['edges'],
@@ -92,6 +101,8 @@ const Incidents = () => {
       pipeName = 'Unknown';
     }
 
+    const imageSrc = incidentImages[event.kind] || incidentImages.default;
+
     return (
       <Card key={event.id} className={isAIDetected ? 'border-l-4 border-l-primary' : ''}>
         <CardHeader>
@@ -144,7 +155,19 @@ const Incidents = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="w-full md:w-48 h-48 flex-shrink-0 rounded-lg overflow-hidden border bg-muted">
+              <img 
+                src={imageSrc} 
+                alt={event.kind} 
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = incidentImages.default;
+                  (e.target as HTMLImageElement).style.opacity = '0.5';
+                }}
+              />
+            </div>
+            <div className="space-y-4 flex-1">
             {/* AI Explainability Panel */}
             {isAIDetected && (
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
@@ -323,6 +346,7 @@ const Incidents = () => {
             <p className="text-xs text-muted-foreground">
               Created: {new Date(event.created_at).toLocaleString()}
             </p>
+          </div>
           </div>
         </CardContent>
       </Card>
