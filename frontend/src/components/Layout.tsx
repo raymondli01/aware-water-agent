@@ -63,14 +63,12 @@ const Layout = ({ children }: LayoutProps) => {
     { to: "/sensors", icon: Activity, label: "Sensors" },
     { to: "/agents", icon: Bot, label: "Agents" },
     { to: "/energy", icon: Zap, label: "Energy" },
-    ...(role === "admin" || role === "engineer"
-      ? [
-          {
-            to: "/admin",
-            icon: Settings,
-            label: role === "admin" ? "Admin" : "Engineer",
-          },
-        ]
+    ...((role === "admin" || role === "engineer")
+      ? [{
+          to: "/admin",
+          icon: Settings,
+          label: role === "admin" ? "Admin" : "Engineer",
+        }]
       : []),
     { to: "/team", icon: Users, label: "Team" },
   ];
