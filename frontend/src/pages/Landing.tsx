@@ -1,11 +1,51 @@
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Droplets, Bot, Zap, Shield, TrendingDown, Activity } from 'lucide-react';
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Droplets,
+  Bot,
+  Zap,
+  Shield,
+  TrendingDown,
+  Activity,
+} from "lucide-react";
 
 const Landing = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Animated Water Background */}
+      <div className="absolute inset-0 -z-10 pointer-events-none">
+        <svg
+          viewBox="0 0 1440 320"
+          className="w-full h-full"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="waterGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.6" />
+            </linearGradient>
+          </defs>
+          <path>
+            <animate
+              attributeName="d"
+              dur="8s"
+              repeatCount="indefinite"
+              values="
+                M0,160 C480,240 960,80 1440,160 L1440,320 L0,320 Z;
+                M0,120 C480,80 960,240 1440,120 L1440,320 L0,320 Z;
+                M0,160 C480,240 960,80 1440,160 L1440,320 L0,320 Z
+              "
+            />
+          </path>
+          <path
+            d="M0,160 C480,240 960,80 1440,160 L1440,320 L0,320 Z"
+            fill="url(#waterGradient)"
+          />
+        </svg>
+      </div>
+
+      {/* Header */}
       <header className="container py-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -20,11 +60,14 @@ const Landing = () => {
         </Link>
       </header>
 
+      {/* Hero Section */}
       <section className="container py-20">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
             <Shield className="w-4 h-4" />
-            <span>CMPE-272: Enterprise Software Platforms | SJSU Fall 2025</span>
+            <span>
+              CMPE-272: Enterprise Software Platforms | SJSU Fall 2025
+            </span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
@@ -35,9 +78,10 @@ const Landing = () => {
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            A proactive, self-healing AI agent for municipal water utilities that couples a digital twin 
-            with multi-agent decision systems to anticipate failures, orchestrate autonomous responses, 
-            and optimize energy use.
+            A proactive, self-healing AI agent for municipal water utilities
+            that couples a digital twin with multi-agent decision systems to
+            anticipate failures, orchestrate autonomous responses, and optimize
+            energy use.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -57,6 +101,7 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Feature Cards */}
       <section className="container py-16">
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           <Card className="border-border/50 hover:border-primary/50 transition-colors">
@@ -64,10 +109,13 @@ const Landing = () => {
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Bot className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold">Proactive Leak Detection</h3>
+              <h3 className="text-xl font-semibold text-primary">
+                Proactive Leak Detection
+              </h3>
               <p className="text-muted-foreground">
-                AI agents monitor acoustic patterns and pressure anomalies to detect leaks before they 
-                become critical, with autonomous isolation capabilities.
+                AI agents monitor acoustic patterns and pressure anomalies to
+                detect leaks before they become critical, with autonomous
+                isolation capabilities.
               </p>
             </CardContent>
           </Card>
@@ -77,10 +125,13 @@ const Landing = () => {
               <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
                 <Zap className="w-6 h-6 text-secondary" />
               </div>
-              <h3 className="text-xl font-semibold">Energy Optimization</h3>
+              <h3 className="text-xl font-semibold text-secondary">
+                Energy Optimization
+              </h3>
               <p className="text-muted-foreground">
-                Dynamic pump scheduling optimizes energy consumption based on real-time pricing, 
-                filling tanks during off-peak hours to maximize savings.
+                Dynamic pump scheduling optimizes energy consumption based on
+                real-time pricing, filling tanks during off-peak hours to
+                maximize savings.
               </p>
             </CardContent>
           </Card>
@@ -90,22 +141,28 @@ const Landing = () => {
               <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
                 <TrendingDown className="w-6 h-6 text-accent" />
               </div>
-              <h3 className="text-xl font-semibold">Reduce Non-Revenue Water</h3>
+              <h3 className="text-xl font-semibold text-accent">
+                Reduce Non-Revenue Water
+              </h3>
               <p className="text-muted-foreground">
-                Comprehensive monitoring and rapid response minimize water loss, reducing non-revenue 
-                water and operational costs across the network.
+                Comprehensive monitoring and rapid response minimize water loss,
+                reducing non-revenue water and operational costs across the
+                network.
               </p>
             </CardContent>
           </Card>
         </div>
       </section>
 
+      {/* Call To Action */}
       <section className="container py-16 text-center">
         <div className="max-w-2xl mx-auto space-y-4">
-          <h2 className="text-3xl font-bold">Ready to Transform Water Management?</h2>
-          <p className="text-muted-foreground">
-            Experience the future of intelligent water utility operations with autonomous 
-            AI agents and digital twin technology.
+          <h2 className="text-3xl font-bold text-white">
+            Ready to Transform Water Management?
+          </h2>
+          <p className="text-white">
+            Experience the future of intelligent water utility operations with
+            autonomous AI agents and digital twin technology.
           </p>
           <Link to="/auth">
             <Button size="lg" className="gap-2 mt-4">
@@ -116,8 +173,9 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Footer */}
       <footer className="container py-8 border-t border-border/40">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white">
           <p>© 2025 Team A.W.A.R.E. - San José State University</p>
           <p>Raymond Li • Sophia Atendido • Jack Liang • Dhruv Verma</p>
         </div>
