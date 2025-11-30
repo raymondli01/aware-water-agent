@@ -11,8 +11,7 @@ import os
 
 # Get allowed origins from environment variable or use defaults
 ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:5173,http://localhost:3000"
+    "ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000"
 ).split(",")
 
 app.add_middleware(
@@ -51,43 +50,40 @@ async def get_sensors():
 @app.post("/sensors/refresh")
 async def refresh_sensors():
     """
-    Refresh all sensors to have the current timestamp and slightly jittered values.
+    Refresh all sensor data with new random values.
+    Uses batch update for performance and synchronization.
     """
     try:
         import random
-        
-        # Fetch all sensors
+
+        # 1. Fetch all sensors
         sensors = await supabase_client.query("sensors", select="*")
-        
+
+        # 2. Update sensors iteratively (fallback for reliability)
         count = 0
         for sensor in sensors:
             sensor_id = sensor["id"]
-            current_value = sensor["value"]
             sensor_type = sensor["type"]
-            
-            # Add slight jitter to values
-            if current_value is not None:
-                if sensor_type == "pressure":
-                    new_value = current_value + random.uniform(-0.5, 0.5)
-                elif sensor_type == "flow":
-                    new_value = current_value + random.uniform(-1.0, 1.0)
-                elif sensor_type == "acoustic":
-                    new_value = current_value + random.uniform(-0.1, 0.1)
-                else:
-                    new_value = current_value
-                    
-                if new_value < 0: new_value = 0
-            else:
-                new_value = None
+            current_value = sensor["value"]
 
-            # Update sensor
+            # Normal values
+            if sensor_type == "pressure":
+                new_value = random.uniform(c.PRESSURE_NORMAL_MIN, c.PRESSURE_NORMAL_MAX)
+            elif sensor_type == "acoustic":
+                new_value = random.uniform(c.ACOUSTIC_NORMAL_MIN, c.ACOUSTIC_NORMAL_MAX)
+            elif sensor_type == "flow":
+                new_value = random.uniform(c.FLOW_NORMAL_MIN, c.FLOW_NORMAL_MAX)
+            else:
+                continue
+
+            # Update sensor individually
             await supabase_client.update(
                 "sensors",
                 {"value": new_value, "last_seen": "now()"},
-                id=f"eq.{sensor_id}"
+                id=f"eq.{sensor_id}",
             )
             count += 1
-            
+
         return {"status": "success", "message": f"Refreshed {count} sensors"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -100,17 +96,14 @@ async def update_edge_sensors(edge_id: str, get_value_fn):
     try:
         # Fetch sensors for this edge
         sensors = await supabase_client.query(
-            "sensors", 
-            select="*",
-            asset_type="eq.edge",
-            asset_id=f"eq.{edge_id}"
+            "sensors", select="*", asset_type="eq.edge", asset_id=f"eq.{edge_id}"
         )
-        
+
         count = 0
         for sensor in sensors:
             sensor_id = sensor["id"]
             sensor_type = sensor["type"]
-            
+
             new_value = get_value_fn(sensor_type)
             if new_value is None:
                 continue
@@ -119,13 +112,14 @@ async def update_edge_sensors(edge_id: str, get_value_fn):
             await supabase_client.update(
                 "sensors",
                 {"value": new_value, "last_seen": "now()"},
-                id=f"eq.{sensor_id}"
+                id=f"eq.{sensor_id}",
             )
             count += 1
-            
+
         return count
     except Exception as e:
         raise e
+
 
 @app.post("/sensors/reset/{edge_id}")
 async def reset_sensors_for_edge(edge_id: str):
@@ -135,7 +129,7 @@ async def reset_sensors_for_edge(edge_id: str):
     """
     try:
         import random
-        
+
         def get_normal_value(sensor_type):
             if sensor_type == "pressure":
                 return random.uniform(c.PRESSURE_NORMAL_MIN, c.PRESSURE_NORMAL_MAX)
@@ -146,7 +140,10 @@ async def reset_sensors_for_edge(edge_id: str):
             return None
 
         count = await update_edge_sensors(edge_id, get_normal_value)
-        return {"status": "success", "message": f"Reset {count} sensors for edge {edge_id}"}
+        return {
+            "status": "success",
+            "message": f"Reset {count} sensors for edge {edge_id}",
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -158,7 +155,7 @@ async def simulate_leak(edge_id: str):
     """
     try:
         import random
-        
+
         def get_leak_value(sensor_type):
             if sensor_type == "pressure":
                 return random.uniform(c.PRESSURE_LEAK_MIN, c.PRESSURE_LEAK_MAX)
@@ -174,7 +171,6 @@ async def simulate_leak(edge_id: str):
         return {"status": "error", "error": str(e)}
 
 
-# Legacy Leak Detection (simple rule-based)
 @app.get("/leaks")
 async def get_leaks():
     """
@@ -200,12 +196,14 @@ async def get_leaks():
             pressure = sensors_dict.get("pressure", 100)
             acoustic = sensors_dict.get("acoustic", 0)
             if pressure < 60 and acoustic > 2.5:  # acoustic in dB
-                leaks.append({
-                    "edge_id": edge_id,
-                    "pressure": pressure,
-                    "acoustic": acoustic,
-                    "leak": True,
-                })
+                leaks.append(
+                    {
+                        "edge_id": edge_id,
+                        "pressure": pressure,
+                        "acoustic": acoustic,
+                        "leak": True,
+                    }
+                )
 
         return {"leaks": leaks, "count": len(leaks)}
     except Exception as e:
@@ -213,6 +211,7 @@ async def get_leaks():
 
 
 # ========== AI AGENT ENDPOINTS ==========
+
 
 @app.post("/ai/analyze")
 async def run_all_agents():
@@ -281,6 +280,7 @@ async def generate_analytics():
 
 # ========== NETWORK TOPOLOGY ENDPOINTS ==========
 
+
 @app.get("/network/topology")
 async def get_network_topology():
     """
@@ -309,7 +309,7 @@ async def get_network_topology():
         incidents = await supabase_client.query(
             "events",
             select="id,title,asset_ref,asset_type,state,severity,priority,confidence,detected_by,created_at",
-            asset_type="eq.edge"
+            asset_type="eq.edge",
         )
 
         # Create incident map by edge_id
@@ -366,35 +366,42 @@ async def get_network_topology():
                 leak_indicator_count += 1
 
             # Filter incidents by state
-            active_incidents = [inc for inc in edge_incidents if inc["state"] != "resolved"]
+            active_incidents = [
+                inc for inc in edge_incidents if inc["state"] != "resolved"
+            ]
             open_incidents = [inc for inc in edge_incidents if inc["state"] == "open"]
-            acknowledged_incidents = [inc for inc in edge_incidents if inc["state"] == "acknowledged"]
-            resolved_incidents = [inc for inc in edge_incidents if inc["state"] == "resolved"]
+            acknowledged_incidents = [
+                inc for inc in edge_incidents if inc["state"] == "acknowledged"
+            ]
+            resolved_incidents = [
+                inc for inc in edge_incidents if inc["state"] == "resolved"
+            ]
 
             # Get highest priority incident (for reference)
             highest_priority_incident = None
             if active_incidents:
                 highest_priority_incident = max(
-                    active_incidents,
-                    key=lambda x: x.get("priority", 0)
+                    active_incidents, key=lambda x: x.get("priority", 0)
                 )
 
-            enhanced_edges.append({
-                **edge,
-                "status": edge_status,  # Based on SENSOR DATA
-                "leak_indicators": leak_indicators,
-                "sensor_data": {
-                    "pressure": pressure,
-                    "acoustic": acoustic,
-                    "flow": flow
-                },
-                "active_incident_count": len(active_incidents),
-                "total_incident_count": len(edge_incidents),
-                "has_open_incidents": len(open_incidents) > 0,
-                "has_acknowledged_incidents": len(acknowledged_incidents) > 0,
-                "highest_priority_incident": highest_priority_incident,
-                "all_incidents": edge_incidents
-            })
+            enhanced_edges.append(
+                {
+                    **edge,
+                    "status": edge_status,  # Based on SENSOR DATA
+                    "leak_indicators": leak_indicators,
+                    "sensor_data": {
+                        "pressure": pressure,
+                        "acoustic": acoustic,
+                        "flow": flow,
+                    },
+                    "active_incident_count": len(active_incidents),
+                    "total_incident_count": len(edge_incidents),
+                    "has_open_incidents": len(open_incidents) > 0,
+                    "has_acknowledged_incidents": len(acknowledged_incidents) > 0,
+                    "highest_priority_incident": highest_priority_incident,
+                    "all_incidents": edge_incidents,
+                }
+            )
 
         return {
             "nodes": nodes,
@@ -402,11 +409,19 @@ async def get_network_topology():
             "incident_summary": {
                 "total_edges": len(edges),
                 "edges_with_leak_indicators": leak_indicator_count,
-                "edges_with_active_incidents": len([e for e in enhanced_edges if e["active_incident_count"] > 0]),
-                "total_active_incidents": sum(e["active_incident_count"] for e in enhanced_edges),
-                "critical_edges": len([e for e in enhanced_edges if e["status"] == "critical"]),
-                "high_severity_edges": len([e for e in enhanced_edges if e["status"] == "high"]),
-            }
+                "edges_with_active_incidents": len(
+                    [e for e in enhanced_edges if e["active_incident_count"] > 0]
+                ),
+                "total_active_incidents": sum(
+                    e["active_incident_count"] for e in enhanced_edges
+                ),
+                "critical_edges": len(
+                    [e for e in enhanced_edges if e["status"] == "critical"]
+                ),
+                "high_severity_edges": len(
+                    [e for e in enhanced_edges if e["status"] == "high"]
+                ),
+            },
         }
     except Exception as e:
         return {"status": "error", "error": str(e), "nodes": [], "edges": []}

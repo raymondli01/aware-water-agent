@@ -7,46 +7,44 @@ interface AnimatedNumberProps {
 }
 
 export const AnimatedNumber = ({ value, className }: AnimatedNumberProps) => {
-  // State Management
   const [displayValue, setDisplayValue] = useState(value);
   const [previousValue, setPreviousValue] = useState<number | null>(null);
-  const [isExiting, setIsExiting] = useState(false);
+  const [isCollapsing, setIsCollapsing] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout>();
 
-  // Animation Lifecycle
+  // Animation State
   useEffect(() => {
     if (value === displayValue) return;
 
     setPreviousValue(displayValue);
     setDisplayValue(value);
-    setIsExiting(false);
+    setIsCollapsing(false);
 
+    // Double requestAnimationFrame ensures transition triggers
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsCollapsing(true);
+      });
+    });
+
+    // Reset previous value after transition
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    // Schedule exit animation after delay
-    const exitDelay = setTimeout(() => {
-      setIsExiting(true);
-    }, 2000);
-
-    // Reset animation state after transition
     timeoutRef.current = setTimeout(() => {
       setPreviousValue(null);
-      setIsExiting(false);
+      setIsCollapsing(false);
     }, 3000);
 
     return () => {
-      clearTimeout(exitDelay);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [value]);
 
   return (
     <div className={`inline-flex items-center ${className}`}>
-      {/* Animated Previous Value with Arrow */}
       {previousValue !== null && (
         <div
-          className={`flex items-center overflow-hidden transition-all duration-1000 ease-in-out ${
-            isExiting ? "max-w-0 opacity-0" : "max-w-[150px] opacity-100"
+          className={`flex items-center overflow-hidden transition-all duration-1000 ease-in-out delay-[2000ms] ${
+            isCollapsing ? "max-w-0 opacity-0" : "max-w-[150px] opacity-100"
           }`}
         >
           <span className="text-muted-foreground line-through decoration-destructive/50 whitespace-nowrap">
@@ -56,7 +54,6 @@ export const AnimatedNumber = ({ value, className }: AnimatedNumberProps) => {
         </div>
       )}
 
-      {/* Current Value Display */}
       <span className="font-bold">{displayValue.toFixed(1)}</span>
     </div>
   );
