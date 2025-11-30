@@ -43,7 +43,8 @@ export const AnimatedNumber = ({ value, className }: AnimatedNumberProps) => {
     <div className={`inline-flex items-center ${className}`}>
       {previousValue !== null && (
         <div
-          className={`flex items-center overflow-hidden transition-all duration-1000 ease-in-out delay-[2000ms] ${
+          style={{ transitionDuration: "2000ms", transitionDelay: "1000ms" }}
+          className={`flex items-center overflow-hidden transition-all ease-in-out ${
             isCollapsing ? "max-w-0 opacity-0" : "max-w-[150px] opacity-100"
           }`}
         >
