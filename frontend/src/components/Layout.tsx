@@ -14,6 +14,7 @@ import {
   Users,
   LogOut,
   Droplets,
+  Activity,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -59,6 +60,7 @@ const Layout = ({ children }: LayoutProps) => {
     { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/network", icon: Network, label: "Network Twin" },
     { to: "/incidents", icon: AlertCircle, label: "Incidents" },
+    { to: "/sensors", icon: Activity, label: "Sensors" },
     { to: "/agents", icon: Bot, label: "Agents" },
     { to: "/energy", icon: Zap, label: "Energy" },
     ...((role === "admin" || role === "engineer")

@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Network from "./pages/Network";
 import Incidents from "./pages/Incidents";
+import SensorData from "./pages/SensorData";
 import Agents from "./pages/Agents";
 import Energy from "./pages/Energy";
 import Admin from "./pages/Admin";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
           <Route path="/network" element={<Layout><Network /></Layout>} />
           <Route path="/incidents" element={<Layout><Incidents /></Layout>} />
+          <Route path="/sensors" element={<Layout><SensorData /></Layout>} />
           <Route path="/agents" element={<Layout><Agents /></Layout>} />
           <Route path="/energy" element={<Layout><Energy /></Layout>} />
           <Route path="/admin" element={<Layout><Admin /></Layout>} />

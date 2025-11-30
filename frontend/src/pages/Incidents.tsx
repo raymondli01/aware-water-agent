@@ -12,6 +12,15 @@ const Incidents = () => {
   const [expandedIncident, setExpandedIncident] = useState<string | null>(null);
   const [showResolvedIncidents, setShowResolvedIncidents] = useState(false);
 
+  // Image mapping for incident types
+  const incidentImages: Record<string, string> = {
+    leak: '/assets/incidents/leak.jpg',
+    quality: '/assets/incidents/quality.jpg',
+    energy: '/assets/incidents/energy.jpg',
+    maintenance: '/assets/incidents/maintenance.jpg',
+    default: '/assets/incidents/maintenance.jpg', // Fallback
+  };
+
   // Fetch edges for name lookup
   const { data: edges } = useQuery({
     queryKey: ['edges'],
@@ -39,7 +48,7 @@ const Incidents = () => {
   });
 
   const updateEventMutation = useMutation({
-    mutationFn: async ({ id, state }: { id: string; state: 'open' | 'acknowledged' | 'resolved' }) => {
+    mutationFn: async ({ id, state, edgeId }: { id: string; state: 'open' | 'acknowledged' | 'resolved'; edgeId?: string }) => {
       const { data, error } = await supabase
         .from('events')
         .update({ state })
@@ -48,6 +57,21 @@ const Incidents = () => {
         .single();
 
       if (error) throw error;
+
+      // If resolving, also reset sensors for this edge
+      if (state === 'resolved' && edgeId) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        try {
+          await fetch(`${API_URL}/sensors/reset/${edgeId}`, {
+            method: 'POST',
+          });
+          toast.success('Sensors reset to normal levels');
+        } catch (err) {
+          console.error('Failed to reset sensors:', err);
+          toast.error('Event resolved, but failed to reset sensors');
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -91,6 +115,8 @@ const Incidents = () => {
     if (!pipeName) {
       pipeName = 'Unknown';
     }
+
+    const imageSrc = incidentImages[event.kind] || incidentImages.default;
 
     return (
       <Card key={event.id} className={isAIDetected ? 'border-l-4 border-l-primary' : ''}>
@@ -144,7 +170,19 @@ const Incidents = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="w-full md:w-48 h-48 flex-shrink-0 rounded-lg overflow-hidden border bg-muted">
+              <img 
+                src={imageSrc} 
+                alt={event.kind} 
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = incidentImages.default;
+                  (e.target as HTMLImageElement).style.opacity = '0.5';
+                }}
+              />
+            </div>
+            <div className="space-y-4 flex-1">
             {/* AI Explainability Panel */}
             {isAIDetected && (
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
@@ -310,7 +348,11 @@ const Incidents = () => {
                   size="sm"
                   variant="default"
                   onClick={() =>
-                    updateEventMutation.mutate({ id: event.id, state: 'resolved' })
+                    updateEventMutation.mutate({ 
+                      id: event.id, 
+                      state: 'resolved',
+                      edgeId: event.asset_ref 
+                    })
                   }
                   disabled={updateEventMutation.isPending}
                 >
@@ -323,6 +365,7 @@ const Incidents = () => {
             <p className="text-xs text-muted-foreground">
               Created: {new Date(event.created_at).toLocaleString()}
             </p>
+          </div>
           </div>
         </CardContent>
       </Card>
