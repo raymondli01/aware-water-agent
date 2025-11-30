@@ -4,6 +4,7 @@ Leak Preemption Agent
 Uses sensor fusion (acoustic + pressure + flow) and OpenAI to predict leaks before they occur.
 Implements confidence-scored leak detection with explainability.
 """
+
 import os
 import json
 from pathlib import Path
@@ -15,7 +16,7 @@ from .supabase_client import supabase_client
 
 # Load .env from project root (two levels up from this file)
 ROOT_DIR = Path(__file__).parent.parent.parent
-load_dotenv(dotenv_path=ROOT_DIR / '.env')
+load_dotenv(dotenv_path=ROOT_DIR / ".env")
 
 
 class LeakPreemptionAgent:
@@ -68,7 +69,9 @@ class LeakPreemptionAgent:
                     edges_sensors[asset_id][sensor_type] = sensor
                 else:
                     # Compare timestamps and keep the newer one
-                    existing_time = edges_sensors[asset_id][sensor_type].get("last_seen", "")
+                    existing_time = edges_sensors[asset_id][sensor_type].get(
+                        "last_seen", ""
+                    )
                     new_time = sensor.get("last_seen", "")
                     if new_time > existing_time:
                         edges_sensors[asset_id][sensor_type] = sensor
@@ -80,34 +83,50 @@ class LeakPreemptionAgent:
 
         return edges_data
 
-    def _prepare_prompt(self, edge_data: Dict[str, List[Dict[str, Any]]]) -> str:
+    async def _fetch_edge_details(self) -> Dict[str, Dict[str, Any]]:
         """
-        Prepare prompt for OpenAI with sensor data
+        Fetch edge details (material, installation_date)
+        """
+        edges = await supabase_client.query(
+            "edges", select="id,material,installation_date"
+        )
+        return {e["id"]: e for e in edges}
 
-        Args:
-            edge_data: Dictionary of edge sensors
-
-        Returns:
-            Formatted prompt string
+    def _prepare_prompt(
+        self,
+        edge_data: Dict[str, List[Dict[str, Any]]],
+        edge_details: Dict[str, Dict[str, Any]],
+    ) -> str:
+        """
+        Prepare prompt for OpenAI with sensor data AND pipe details
         """
         prompt = """You are an expert leak detection AI agent for water distribution systems.
 
-Your task is to analyze sensor data from water pipes and predict leak likelihood using sensor fusion.
+Your task is to analyze sensor data from water pipes and predict leak likelihood using sensor fusion, considering pipe material and age.
 
 IMPORTANT BASELINE RANGES (for reference):
 - Pressure: NORMAL = 60-70 psi | LEAK INDICATOR = < 55 psi (sudden drop)
 - Acoustic: NORMAL = 2-3 dB   | LEAK INDICATOR = > 5 dB (spike in vibration/noise)
 - Flow:     NORMAL = 80-100 L/s | LEAK INDICATOR = > 110 L/s (unexpected increase)
 
+RISK FACTORS:
+- Material: Iron/Steel = Higher Risk (corrosion) | PVC/PE = Lower Risk
+- Age: > 30 years = Higher Risk | < 10 years = Lower Risk
+
 A leak is highly likely when you see:
 - Pressure DROP (below 55 psi) + Acoustic SPIKE (above 5 dB) = High confidence leak
 - Any TWO of these factors together = Moderate confidence leak
 - One factor alone = Low confidence, monitor
+- RISK AMPLIFIER: If pipe is OLD or IRON, increase confidence/urgency.
 
 Sensor Data by Pipe:
 """
         for edge_id, sensors in edge_data.items():
-            prompt += f"\n--- Pipe {edge_id} ---\n"
+            details = edge_details.get(edge_id, {})
+            material = details.get("material", "Unknown")
+            install_date = details.get("installation_date", "Unknown")
+
+            prompt += f"\n--- Pipe {edge_id} (Material: {material}, Installed: {install_date}) ---\n"
             for sensor in sensors:
                 prompt += f"  - {sensor['type']}: {sensor['value']} {sensor['unit']} (last seen: {sensor['last_seen']})\n"
 
@@ -118,12 +137,12 @@ Analyze this data and identify ANY pipes that show leak indicators. For each pip
    - High acoustic readings (unusual vibrations/noise)
    - Low pressure readings (indicating pressure loss)
    - High flow readings (unexpected water movement)
-   - Combinations of these factors
+   - Pipe Material/Age (Old Iron pipes are more likely to leak)
 
 2. Provide reasoning explaining:
    - What patterns you observed in the sensor data
+   - How pipe material/age contributed to the risk assessment
    - Why these patterns suggest a leak
-   - Which sensor readings are most concerning
    - The urgency level (immediate, soon, monitor)
 
 3. Recommend specific actions:
@@ -180,11 +199,7 @@ If no leaks are detected, return: {"leaks": []}
         priority = int(confidence * 50)
 
         # Add urgency bonus
-        urgency_bonus = {
-            "immediate": 50,
-            "soon": 30,
-            "monitor": 10
-        }
+        urgency_bonus = {"immediate": 50, "soon": 30, "monitor": 10}
         priority += urgency_bonus.get(urgency, 10)
 
         # Cap at 100
@@ -200,11 +215,7 @@ If no leaks are detected, return: {"leaks": []}
         Returns:
             Event severity (critical, high, medium, low)
         """
-        mapping = {
-            "immediate": "critical",
-            "soon": "high",
-            "monitor": "medium"
-        }
+        mapping = {"immediate": "critical", "soon": "high", "monitor": "medium"}
         return mapping.get(urgency, "medium")
 
     async def _create_incident(self, leak: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -226,7 +237,9 @@ If no leaks are detected, return: {"leaks": []}
             sensor_indicators = leak.get("sensor_indicators", {})
 
             # Get edge name from database for user-friendly display
-            edge = await supabase_client.query("edges", select="name", id=f"eq.{edge_id}")
+            edge = await supabase_client.query(
+                "edges", select="name", id=f"eq.{edge_id}"
+            )
             edge_name = edge[0]["name"] if edge else edge_id[:8]
 
             # Check for existing open incidents on this edge to prevent duplicates
@@ -235,11 +248,13 @@ If no leaks are detected, return: {"leaks": []}
                 select="id,state",
                 asset_ref=f"eq.{edge_id}",
                 state=f"in.(open,acknowledged)",
-                kind="eq.leak"
+                kind="eq.leak",
             )
 
             if existing_incidents and len(existing_incidents) > 0:
-                print(f"⏭️  Skipping duplicate incident for Pipe {edge_name} - active incident already exists (ID: {existing_incidents[0]['id'][:8]})")
+                print(
+                    f"⏭️  Skipping duplicate incident for Pipe {edge_name} - active incident already exists (ID: {existing_incidents[0]['id'][:8]})"
+                )
                 return None
 
             # Calculate priority and severity
@@ -264,14 +279,16 @@ If no leaks are detected, return: {"leaks": []}
                     "recommendation": recommendation,
                     "urgency": urgency,
                     "detection_timestamp": datetime.utcnow().isoformat(),
-                    "edge_name": edge_name  # Store for easy reference
-                }
+                    "edge_name": edge_name,  # Store for easy reference
+                },
             }
 
             # Insert into events table
             result = await supabase_client.insert("events", incident_data)
 
-            print(f"✓ Created incident for leak at Pipe {edge_name} (confidence: {confidence:.2f}, priority: {priority})")
+            print(
+                f"✓ Created incident for leak at Pipe {edge_name} (confidence: {confidence:.2f}, priority: {priority})"
+            )
 
             return result
 
@@ -290,15 +307,18 @@ If no leaks are detected, return: {"leaks": []}
         # Fetch sensor data
         edge_data = await self._fetch_sensor_data()
 
+        # Fetch edge details (material, age)
+        edge_details = await self._fetch_edge_details()
+
         if not edge_data:
             return {
                 "status": "no_data",
                 "leaks_detected": [],
-                "message": "No sensor data available for analysis"
+                "message": "No sensor data available for analysis",
             }
 
         # Prepare prompt
-        prompt = self._prepare_prompt(edge_data)
+        prompt = self._prepare_prompt(edge_data, edge_details)
 
         # Call OpenAI
         try:
@@ -307,15 +327,12 @@ If no leaks are detected, return: {"leaks": []}
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a leak detection expert AI. Analyze sensor data objectively and flag ALL pipes that meet leak indicator thresholds. Always respond with valid JSON only."
+                        "content": "You are a leak detection expert AI. Analyze sensor data objectively and flag ALL pipes that meet leak indicator thresholds. Always respond with valid JSON only.",
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.5,  # Moderate temperature for reliable detection
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
 
             # Parse response
@@ -337,13 +354,16 @@ If no leaks are detected, return: {"leaks": []}
             for leak in leaks:
                 edge_id = leak.get("edge_id")
                 if edge_id:
-                    edge = await supabase_client.query("edges", select="name", id=f"eq.{edge_id}")
+                    edge = await supabase_client.query(
+                        "edges", select="name", id=f"eq.{edge_id}"
+                    )
                     leak["edge_name"] = edge[0]["name"] if edge else edge_id[:8]
 
             # Filter leaks by confidence threshold for auto-creation (70%)
             auto_create_threshold = 0.70
             actionable_leaks = [
-                leak for leak in leaks
+                leak
+                for leak in leaks
                 if leak.get("confidence", 0) >= auto_create_threshold
             ]
 
@@ -372,7 +392,9 @@ If no leaks are detected, return: {"leaks": []}
                 "leaks_detected": [],
             }
 
-    async def create_decision_record(self, analysis_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def create_decision_record(
+        self, analysis_result: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Create an agent_decision record in Supabase
 
@@ -410,7 +432,10 @@ If no leaks are detected, return: {"leaks": []}
                 # For now, we return the prepared data
                 # result = await supabase_client.insert("agent_decisions", decisions)
                 # return result
-                return {"decisions": decisions, "note": "Table agent_decisions needs to be created"}
+                return {
+                    "decisions": decisions,
+                    "note": "Table agent_decisions needs to be created",
+                }
 
             return None
 

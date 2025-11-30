@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -14,7 +16,6 @@ import {
   Activity,
   Droplets,
   Gauge,
-  TrendingUp,
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
@@ -26,7 +27,6 @@ const SensorData = () => {
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   // Mutations
-  // Data Refresh Mutation
   const refreshMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`${API_URL}/sensors/refresh`, {
@@ -44,7 +44,6 @@ const SensorData = () => {
     },
   });
 
-  // Leak Simulation Mutation
   const simulateLeakMutation = useMutation({
     mutationFn: async (edgeId: string) => {
       const response = await fetch(
@@ -66,7 +65,6 @@ const SensorData = () => {
   });
 
   // Data Fetching
-  // Sensor Data Query
   const { data: sensors, isLoading: isLoadingSensors } = useQuery({
     queryKey: ["sensors-raw"],
     queryFn: async () => {
@@ -81,7 +79,6 @@ const SensorData = () => {
     refetchInterval: 5000,
   });
 
-  // Edge Metadata Query
   const { data: edgesData, isLoading: isLoadingEdges } = useQuery({
     queryKey: ["edges"],
     queryFn: async () => {
@@ -95,12 +92,11 @@ const SensorData = () => {
   const isLoading = isLoadingSensors || isLoadingEdges;
 
   // Data Transformation
-  // Map Edge IDs to Names
   const edgeNameMap = new Map(
     edgesData?.map((edge) => [edge.id, edge.name]) || []
   );
 
-  // Group Sensors by Edge
+  // Group sensors by edge and keep latest reading per type
   const sensorsByEdge = sensors?.reduce((acc: any, sensor: any) => {
     if (sensor.asset_type === "edge") {
       const edgeId = sensor.asset_id;
@@ -111,7 +107,6 @@ const SensorData = () => {
           sensors: [],
         };
       }
-      // Keep Latest Reading Per Type
       const existingTypeIndex = acc[edgeId].sensors.findIndex(
         (s: any) => s.type === sensor.type
       );
@@ -122,27 +117,10 @@ const SensorData = () => {
     return acc;
   }, {});
 
-  // Sort Edge Groups by Name
   const sortedGroups = Object.values(sensorsByEdge || {}).sort(
     (a: any, b: any) =>
       a.name.localeCompare(b.name, undefined, { numeric: true })
   );
-
-  // Sensor Type Display Order
-  const typeOrder: Record<string, number> = {
-    pressure: 1,
-    flow: 2,
-    acoustic: 3,
-  };
-
-  // Sort Sensors Within Each Edge Group
-  sortedGroups.forEach((group: any) => {
-    group.sensors.sort((a: any, b: any) => {
-      const orderA = typeOrder[a.type] || 99;
-      const orderB = typeOrder[b.type] || 99;
-      return orderA - orderB;
-    });
-  });
 
   const edges = sortedGroups;
 
@@ -155,58 +133,74 @@ const SensorData = () => {
 
     if (isAlert) {
       return {
-        bg: "bg-red-50 dark:bg-red-950/30",
-        border: "border-red-200 dark:border-red-800",
-        iconBg: "bg-red-100 dark:bg-red-900/50",
+        textColor: "text-red-700 dark:text-red-400",
+        valueColor: "text-red-700 dark:text-red-400 font-bold",
         iconColor: "text-red-600 dark:text-red-400",
-        textColor: "text-red-700 dark:text-red-300",
-        valueColor: "text-red-700 dark:text-red-400",
       };
     }
 
     switch (type) {
       case "pressure":
         return {
-          bg: "bg-blue-50/50 dark:bg-blue-950/20",
-          border: "border-blue-100 dark:border-blue-800",
-          iconBg: "bg-blue-100 dark:bg-blue-900/50",
-          iconColor: "text-blue-600 dark:text-blue-400",
           textColor: "text-blue-700 dark:text-blue-300",
           valueColor: "text-foreground",
+          iconColor: "text-blue-600 dark:text-blue-400",
         };
       case "acoustic":
         return {
-          bg: "bg-orange-50/50 dark:bg-orange-950/20",
-          border: "border-orange-100 dark:border-orange-800",
-          iconBg: "bg-orange-100 dark:bg-orange-900/50",
-          iconColor: "text-orange-600 dark:text-orange-400",
           textColor: "text-orange-700 dark:text-orange-300",
           valueColor: "text-foreground",
+          iconColor: "text-orange-600 dark:text-orange-400",
         };
       case "flow":
         return {
-          bg: "bg-cyan-50/50 dark:bg-cyan-950/20",
-          border: "border-cyan-100 dark:border-cyan-800",
-          iconBg: "bg-cyan-100 dark:bg-cyan-900/50",
-          iconColor: "text-cyan-600 dark:text-cyan-400",
           textColor: "text-cyan-700 dark:text-cyan-300",
           valueColor: "text-foreground",
+          iconColor: "text-cyan-600 dark:text-cyan-400",
         };
       default:
         return {
-          bg: "bg-card",
-          border: "border-border",
-          iconBg: "bg-muted",
-          iconColor: "text-muted-foreground",
           textColor: "text-muted-foreground",
           valueColor: "text-foreground",
+          iconColor: "text-muted-foreground",
         };
     }
   };
 
+  // Renders sensor cell for a given type
+  const renderSensorCell = (edgeSensors: any[], type: string) => {
+    const sensor = edgeSensors.find((s) => s.type === type);
+    if (!sensor) return <span className="text-muted-foreground">-</span>;
+
+    const theme = getSensorTheme(type, sensor.value);
+    const Icon =
+      type === "pressure"
+        ? Gauge
+        : type === "acoustic"
+        ? Activity
+        : type === "flow"
+        ? Droplets
+        : Activity;
+
+    return (
+      <div className="flex items-center gap-2">
+        <Icon className={`w-4 h-4 ${theme.iconColor}`} />
+        <div className="flex items-baseline gap-1">
+          <span className={`${theme.valueColor} tabular-nums`}>
+            {typeof sensor.value === "number" ? (
+              <AnimatedNumber value={sensor.value} />
+            ) : (
+              sensor.value
+            )}
+          </span>
+          <span className={`text-xs ${theme.textColor}`}>{sensor.unit}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -232,122 +226,96 @@ const SensorData = () => {
         </Button>
       </div>
 
-      {/* Sensor Data Cards */}
-      <div className="grid gap-6">
+      <div className="rounded-md border bg-card">
         {isLoading ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              Loading sensor data...
-            </CardContent>
-          </Card>
+          <div className="p-8 text-center text-muted-foreground">
+            Loading sensor data...
+          </div>
         ) : edges.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No sensor data available.
-            </CardContent>
-          </Card>
+          <div className="p-8 text-center text-muted-foreground">
+            No sensor data available.
+          </div>
         ) : (
-          (edges as any[]).map((edge: any) => (
-            <Card key={edge.id} className="overflow-hidden">
-              {/* Edge Header */}
-              <CardHeader className="pb-3 bg-muted/30 border-b">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      Pipe: {edge.name}
-                    </CardTitle>
-                    <Badge
-                      variant="outline"
-                      className="font-mono text-xs bg-background/50"
-                    >
-                      {edge.id}
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => simulateLeakMutation.mutate(edge.id)}
-                    disabled={simulateLeakMutation.isPending}
-                  >
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Simulate Leak
-                  </Button>
-                </div>
-              </CardHeader>
-              {/* Sensor Readings */}
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {edge.sensors.map((sensor: any) => {
-                    const theme = getSensorTheme(sensor.type, sensor.value);
-                    return (
-                      <div
-                        key={sensor.id}
-                        className={`flex items-center p-4 border rounded-xl transition-all duration-200 hover:shadow-md ${theme.bg} ${theme.border}`}
-                      >
-                        <div
-                          className={`mr-4 p-3 rounded-full ${theme.iconBg}`}
-                        >
-                          {sensor.type === "pressure" && (
-                            <Gauge className={`w-6 h-6 ${theme.iconColor}`} />
-                          )}
-                          {sensor.type === "acoustic" && (
-                            <Activity
-                              className={`w-6 h-6 ${theme.iconColor}`}
-                            />
-                          )}
-                          {sensor.type === "flow" && (
-                            <Droplets
-                              className={`w-6 h-6 ${theme.iconColor}`}
-                            />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <p
-                            className={`text-sm font-semibold capitalize mb-1 ${theme.textColor}`}
-                          >
-                            {sensor.type}
-                          </p>
-                          <div className="flex items-baseline gap-1">
-                            <span
-                              className={`text-2xl font-bold tracking-tight ${theme.valueColor}`}
-                            >
-                              {typeof sensor.value === "number" ? (
-                                <AnimatedNumber value={sensor.value} />
-                              ) : (
-                                sensor.value
-                              )}
-                            </span>
-                            <span
-                              className={`text-sm font-medium ${theme.textColor}`}
-                            >
-                              {sensor.unit}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                              Updated:{" "}
-                              {new Date(sensor.last_seen).toLocaleTimeString()}
-                            </p>
-                            {new Date().getTime() -
-                              new Date(sensor.last_seen).getTime() >
-                              24 * 60 * 60 * 1000 && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 h-4 border-yellow-500 text-yellow-700 bg-yellow-100"
-                              >
-                                STALE
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
+          <Table className="table-fixed">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[20%]">Pipe</TableHead>
+                <TableHead className="w-[15%]">Pressure</TableHead>
+                <TableHead className="w-[15%]">Flow</TableHead>
+                <TableHead className="w-[15%]">Acoustic</TableHead>
+                <TableHead className="w-[20%]">Last Update</TableHead>
+                <TableHead className="text-right w-[15%]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(edges as any[]).map((edge: any) => {
+                // Find most recent update time across sensors for this edge
+                const lastUpdate = edge.sensors.reduce(
+                  (latest: number, sensor: any) => {
+                    const sensorTime = new Date(sensor.last_seen).getTime();
+                    return sensorTime > latest ? sensorTime : latest;
+                  },
+                  0
+                );
+
+                const isStale =
+                  new Date().getTime() - lastUpdate > 24 * 60 * 60 * 1000;
+
+                return (
+                  <TableRow key={edge.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-base">
+                          {edge.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {edge.id}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                    </TableCell>
+                    <TableCell>
+                      {renderSensorCell(edge.sensors, "pressure")}
+                    </TableCell>
+                    <TableCell>
+                      {renderSensorCell(edge.sensors, "flow")}
+                    </TableCell>
+                    <TableCell>
+                      {renderSensorCell(edge.sensors, "acoustic")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm text-muted-foreground">
+                          {lastUpdate
+                            ? new Date(lastUpdate).toLocaleTimeString()
+                            : "-"}
+                        </span>
+                        {isStale && (
+                          <Badge
+                            variant="outline"
+                            className="w-fit text-[10px] px-1.5 py-0 h-4 border-yellow-500 text-yellow-700 bg-yellow-100"
+                          >
+                            STALE
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => simulateLeakMutation.mutate(edge.id)}
+                        disabled={simulateLeakMutation.isPending}
+                      >
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        Simulate Leak
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

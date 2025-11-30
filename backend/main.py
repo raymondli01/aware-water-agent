@@ -388,6 +388,8 @@ async def get_network_topology():
                 {
                     **edge,
                     "status": edge_status,  # Based on SENSOR DATA
+                    "material": edge.get("material", "Unknown"),
+                    "installation_date": edge.get("installation_date"),
                     "leak_indicators": leak_indicators,
                     "sensor_data": {
                         "pressure": pressure,
