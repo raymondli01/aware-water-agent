@@ -4,8 +4,24 @@
 
 A proactive, self-healing AI agent for municipal water utilities that couples a digital twin with multi-agent decision systems to anticipate failures, orchestrate autonomous responses, and optimize energy use.
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-success?style=for-the-badge)](http://aware-water-alb-1513973059.us-east-1.elb.amazonaws.com/)
+[![Course](https://img.shields.io/badge/CMPE--272-Enterprise%20Software%20Platforms-blue?style=for-the-badge)](https://catalog.sjsu.edu/preview_program.php?catoid=17&poid=13939)
+[![SJSU](https://img.shields.io/badge/San%20José%20State%20University-Fall%202025-gold?style=for-the-badge)](https://www.sjsu.edu/)
+
+---
+
+## 📚 Documentation
+
+> **Complete project documentation is available in the following reports:**
+
+- **[Design Thinking Report](./AWARE_CMPE272_Design_Thinking_Report.pdf)** - Design methodology, user research, and system ideation
+- **[Final Project Report](./AWARE_CMPE272_Project_Report.pdf)** - Complete technical documentation, architecture, and implementation details
+
+---
+
 ## Table of Contents
 
+- [📚 Documentation](#-documentation)
 - [Team & Contact](#team--contact)
 - [Project Overview](#project-overview)
 - [Architecture](#architecture)
@@ -17,7 +33,6 @@ A proactive, self-healing AI agent for municipal water utilities that couples a 
 - [Technology Stack](#technology-stack)
 - [Features & Pages](#features--pages)
 - [Development](#development)
-- [Wireframes](#wireframes)
 - [Database Schema](#database-schema)
 - [Recent Updates](#recent-updates)
 - [Troubleshooting](#troubleshooting)
@@ -45,15 +60,28 @@ For questions or support, please contact any team member at the emails above.
 
 ## Project Overview
 
-### Key Features
+A.W.A.R.E. is an intelligent water utility management platform that leverages autonomous AI agents to proactively detect infrastructure failures, optimize energy consumption, and maintain network resilience. The system combines real-time sensor monitoring with predictive analytics to minimize water loss and operational costs.
 
-- **Proactive Leak Detection**: AI agents monitor acoustic patterns and pressure anomalies to detect leaks before they become critical
-- **Autonomous Isolation**: Automatic pipe isolation when leaks are detected
-- **Energy Optimization**: Dynamic pump scheduling based on real-time pricing
-- **Digital Twin**: Real-time network visualization with live updates
-- **Multi-Agent System**: Coordinated AI agents for decision-making
-- **Incident Management**: Track and resolve system events
-- **Real-time Monitoring**: Live sensor data and network status
+### 🎯 Key Features
+
+- **🔍 Proactive Leak Detection**: AI agents monitor acoustic patterns and pressure anomalies to detect leaks before they become critical
+- **🛡️ Autonomous Isolation**: Automatic pipe isolation when leaks are detected
+- **⚡ Energy Optimization**: Dynamic pump scheduling based on real-time pricing and demand forecasting
+- **🗺️ Digital Twin**: Interactive real-time network visualization with live sensor updates
+- **🤖 Multi-Agent System**: Coordinated AI agents for intelligent decision-making
+- **📊 Incident Management**: Comprehensive tracking and resolution of system events
+- **📡 Real-time Monitoring**: Live sensor data streams and network health status
+
+### 🤖 AI Agent System
+
+The platform employs four specialized autonomous agents:
+
+| Agent | Purpose | Key Capabilities |
+|-------|---------|-----------------|
+| **Leak Preemption Agent** | Early leak detection | Analyzes pressure, flow, and acoustic patterns to predict failures |
+| **Safety Monitor Agent** | Network safety oversight | Monitors water quality and pressure thresholds for public safety |
+| **Energy Optimizer Agent** | Cost reduction | Optimizes pump schedules based on demand forecasts and electricity pricing |
+| **Analytics Agent** | System intelligence | Provides insights, trends, and performance metrics |
 
 ---
 
@@ -434,20 +462,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## Wireframes
-
-Complete wireframes for all pages and components are available in [WIREFRAMES.md](./WIREFRAMES.md).
-
-The wireframes document includes:
-
-- All page layouts
-- Component structures
-- Data flow diagrams
-- Responsive design breakpoints
-- Accessibility guidelines
-
----
-
 ## Database Schema
 
 The system uses Supabase with the following main tables:
@@ -598,6 +612,8 @@ Copyright © 2025 Team A.W.A.R.E. - San José State University
 
 ## Project Links
 
-- **Repository**: https://github.com/raymondli01/aware-water-agent
-- **Live Demo**: http://aware-water-alb-1513973059.us-east-1.elb.amazonaws.com/
-- **Documentation**: See [WIREFRAMES.md](./WIREFRAMES.md) for complete UI documentation
+- **🔗 GitHub Repository**: [github.com/raymondli01/aware-water-agent](https://github.com/raymondli01/aware-water-agent)
+- **🌐 Live Demo**: [AWARE Water Management System](http://aware-water-alb-1513973059.us-east-1.elb.amazonaws.com/)
+- **📄 Design Report**: [AWARE_CMPE272_Design_Thinking_Report.pdf](./AWARE_CMPE272_Design_Thinking_Report.pdf)
+- **📄 Project Report**: [AWARE_CMPE272_Project_Report.pdf](./AWARE_CMPE272_Project_Report.pdf)
+- **📋 Deployment Guide**: [DEPLOYMENT.md](./DEPLOYMENT.md)
