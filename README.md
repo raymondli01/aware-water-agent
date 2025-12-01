@@ -4,7 +4,7 @@
 
 A proactive, self-healing AI agent for municipal water utilities that couples a digital twin with multi-agent decision systems to anticipate failures, orchestrate autonomous responses, and optimize energy use.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-success?style=for-the-badge)](http://aware-water-alb-1513973059.us-east-1.elb.amazonaws.com/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-success?style=for-the-badge)](http://aware-water-alb-1723674360.us-west-1.elb.amazonaws.com/)
 [![Course](https://img.shields.io/badge/CMPE--272-Enterprise%20Software%20Platforms-blue?style=for-the-badge)](https://catalog.sjsu.edu/preview_program.php?catoid=17&poid=13939)
 [![SJSU](https://img.shields.io/badge/San%20José%20State%20University-Fall%202025-gold?style=for-the-badge)](https://www.sjsu.edu/)
 
@@ -613,7 +613,7 @@ Copyright © 2025 Team A.W.A.R.E. - San José State University
 ## Project Links
 
 - **🔗 GitHub Repository**: [github.com/raymondli01/aware-water-agent](https://github.com/raymondli01/aware-water-agent)
-- **🌐 Live Demo**: [AWARE Water Management System](http://aware-water-alb-1513973059.us-east-1.elb.amazonaws.com/)
+- **🌐 Live Demo**: [AWARE Water Management System](http://aware-water-alb-1723674360.us-west-1.elb.amazonaws.com/)
 - **📄 Design Report**: [AWARE_CMPE272_Design_Thinking_Report.pdf](./AWARE_CMPE272_Design_Thinking_Report.pdf)
 - **📄 Project Report**: [AWARE_CMPE272_Project_Report.pdf](./AWARE_CMPE272_Project_Report.pdf)
 - **📋 Deployment Guide**: [DEPLOYMENT.md](./DEPLOYMENT.md)
