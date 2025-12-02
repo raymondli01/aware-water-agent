@@ -37,7 +37,7 @@ export const AnimatedNumber = ({ value, className }: AnimatedNumberProps) => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [value]);
+  }, [value, displayValue]);
 
   return (
     <div className={`inline-flex items-center ${className}`}>

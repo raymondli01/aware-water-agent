@@ -17,26 +17,84 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface AgentResult {
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
   status: string;
-  [key: string]: any;
+  confidence?: number | null;
+  last_decision?: string | null;
+  metrics?: Record<string, string | number | boolean | null>;
+}
+
+interface LeakRecommendation {
+  action?: string;
+  valves_to_close?: string[];
+}
+
+interface LeakDetectionResult {
+  edge_name?: string;
+  edge_id?: string;
+  urgency?: string;
+  confidence: number;
+  reasoning?: string;
+  recommendation?: LeakRecommendation;
+}
+
+interface SafetyIssue {
+  category?: string;
+  severity?: string;
+  reasoning?: string;
+  immediate_actions?: string[];
+}
+
+interface OptimizationScheduleEntry {
+  hour: number;
+  status?: string;
+}
+
+interface Optimization {
+  pump_name?: string;
+  estimated_daily_savings_usd?: number;
+  reasoning?: string;
+  schedule?: OptimizationScheduleEntry[];
+}
+
+interface AgentAnalysisResult {
+  status?: string;
+  error?: string;
+  leaks_detected?: LeakDetectionResult[];
+  safety_status?: string;
+  overall_assessment?: string;
+  issues?: SafetyIssue[];
+  optimizations?: Optimization[];
+  total_estimated_savings?: number;
+  overall_strategy?: string;
+  sensor_counts?: {
+    pressure?: number;
+    flow?: number;
+    acoustic?: number;
+  };
+  sensor_count?: number;
+  pipes_analyzed?: number;
+  confidence_threshold?: number;
 }
 
 const Agents = () => {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
+  const [agentResult, setAgentResult] = useState<AgentAnalysisResult | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
 
-  const { data: agents } = useQuery({
+  const { data: agents } = useQuery<Agent[]>({
     queryKey: ['agents'],
     queryFn: async () => {
       const { data } = await supabase.from('agents').select('*');
-      return data || [];
+      return (data as Agent[]) || [];
     },
   });
 
-  const runAgentMutation = useMutation({
+  const runAgentMutation = useMutation<AgentAnalysisResult, Error, { agentName: string; agentId: string }>({
     mutationFn: async ({ agentName, agentId }: { agentName: string; agentId: string }) => {
       setRunningAgentId(agentId);
 
@@ -62,7 +120,8 @@ const Agents = () => {
         throw new Error('Failed to run agent');
       }
 
-      return response.json();
+      const result = await response.json();
+      return result as AgentAnalysisResult;
     },
     onSuccess: (data, variables) => {
       setAgentResult(data);
@@ -73,10 +132,10 @@ const Agents = () => {
         description: 'View results in the dialog',
       });
     },
-    onError: (error, variables) => {
+    onError: (error: Error, variables) => {
       setRunningAgentId(null);
       toast.error(`Failed to run ${variables.agentName}`, {
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: error.message,
       });
     },
   });
@@ -131,12 +190,12 @@ const Agents = () => {
                 <div className="space-y-2 pt-2 border-t border-border">
                   <p className="text-sm font-medium">Metrics:</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {Object.entries(agent.metrics as Record<string, any>).map(([key, value]) => (
+                    {Object.entries(agent.metrics ?? {}).map(([key, value]) => (
                       <div key={key} className="space-y-1">
                         <p className="text-xs text-muted-foreground capitalize">
                           {key.replace(/_/g, ' ')}
                         </p>
-                        <p className="font-medium">{value}</p>
+                        <p className="font-medium">{String(value)}</p>
                       </div>
                     ))}
                   </div>
@@ -209,7 +268,7 @@ const Agents = () => {
                       <AlertDescription>All pipes are operating normally</AlertDescription>
                     </Alert>
                   ) : (
-                    agentResult.leaks_detected.map((leak: any, idx: number) => (
+                    agentResult.leaks_detected.map((leak: LeakDetectionResult, idx: number) => (
                       <Card key={idx} className="border-orange-200">
                         <CardHeader>
                           <div className="flex items-center justify-between">
@@ -261,7 +320,7 @@ const Agents = () => {
                   {agentResult.issues && agentResult.issues.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-lg mb-2">Safety Issues ({agentResult.issues.length})</h3>
-                      {agentResult.issues.map((issue: any, idx: number) => (
+                      {agentResult.issues.map((issue: SafetyIssue, idx: number) => (
                         <Card key={idx} className="mb-3">
                           <CardHeader>
                             <div className="flex items-center justify-between">
@@ -322,7 +381,7 @@ const Agents = () => {
                       </AlertDescription>
                     </Alert>
                   ) : (
-                    agentResult.optimizations.map((opt: any, idx: number) => (
+                    agentResult.optimizations.map((opt: Optimization, idx: number) => (
                       <Card key={idx} className="border-green-200">
                         <CardHeader>
                           <div className="flex items-center justify-between">
@@ -345,7 +404,7 @@ const Agents = () => {
                             <div>
                               <p className="text-sm font-medium mb-2">24-Hour Schedule:</p>
                               <div className="grid grid-cols-6 gap-2">
-                                {opt.schedule.slice(0, 24).map((s: any, i: number) => (
+                                {opt.schedule.slice(0, 24).map((s: OptimizationScheduleEntry, i: number) => (
                                   <div
                                     key={i}
                                     className={`p-2 rounded text-center text-xs ${

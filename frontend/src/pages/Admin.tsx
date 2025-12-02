@@ -27,11 +27,42 @@ interface UserWithRole {
 interface SystemConfig {
   id: string;
   config_key: string;
-  config_value: any;
+  config_value: ConfigValue;
   description: string;
   category: string;
   updated_at?: string;
   updated_by?: string | null;
+}
+
+type RoleKey = 'admin' | 'engineer' | 'operator';
+type ConfigValue = string | number | boolean | Record<string, unknown> | string[] | number[] | boolean[] | null;
+
+interface UserRoleRow {
+  user_id: string;
+  role: RoleKey;
+  created_at: string;
+}
+
+interface ProfileRow {
+  id: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+interface EdgeRow {
+  id: string;
+  status: string;
+}
+
+interface SensorRow {
+  id: string;
+  type: string | null;
+}
+
+interface EventRow {
+  id: string;
+  severity: string | null;
+  state: string;
 }
 
 interface ValvePump {
@@ -85,13 +116,13 @@ const permissionCatalog = [
   },
 ] as const;
 
-const permissionConfigKeys: Record<'admin' | 'engineer' | 'operator', string> = {
+const permissionConfigKeys: Record<RoleKey, string> = {
   admin: 'permissions_admin',
   engineer: 'permissions_engineer',
   operator: 'permissions_operator',
 };
 
-const defaultRolePermissions: Record<'admin' | 'engineer' | 'operator', string[]> = {
+const defaultRolePermissions: Record<RoleKey, string[]> = {
   admin: ['manage_users', 'configure_system', 'manage_network', 'view_dashboard', 'manage_incidents', 'view_ai_recommendations'],
   engineer: ['manage_network', 'view_dashboard', 'manage_incidents', 'view_ai_recommendations'],
   operator: ['view_dashboard', 'manage_incidents', 'view_ai_recommendations'],
@@ -105,9 +136,9 @@ const Admin = () => {
   const isEngineer = role === 'engineer';
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [newUserId, setNewUserId] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'engineer' | 'operator'>('operator');
+  const [newUserRole, setNewUserRole] = useState<RoleKey>('operator');
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
-  const [rolePermissions, setRolePermissions] = useState<Record<'admin' | 'engineer' | 'operator', Set<string>> | null>(null);
+  const [rolePermissions, setRolePermissions] = useState<Record<RoleKey, Set<string>> | null>(null);
   const [setpointDrafts, setSetpointDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -121,19 +152,19 @@ const Admin = () => {
     queryKey: ['admin-users'],
     queryFn: async () => {
       const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
+        .from<UserRoleRow>('user_roles')
         .select('*');
       if (rolesError) throw rolesError;
 
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from<ProfileRow>('profiles')
         .select('*');
       if (profilesError) throw profilesError;
 
-      const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
       const usersWithRoles = new Map(
-        userRoles?.map((ur: any) => {
+        userRoles?.map((ur) => {
           const profile = profileMap.get(ur.user_id);
           return [
             ur.user_id,
@@ -141,14 +172,14 @@ const Admin = () => {
               id: ur.user_id,
               email: `user-${ur.user_id.substring(0, 8)}@system.local`,
               display_name: profile?.display_name || null,
-              role: ur.role,
+              role: ur.role as RoleKey,
               created_at: profile?.created_at || ur.created_at,
             } as UserWithRole,
           ];
         }) || []
       );
 
-      profiles?.forEach((profile: any) => {
+      profiles?.forEach((profile) => {
         if (!usersWithRoles.has(profile.id)) {
           usersWithRoles.set(profile.id, {
             id: profile.id,
@@ -169,8 +200,8 @@ const Admin = () => {
   const { data: systemConfig, isLoading: configLoading } = useQuery<SystemConfig[]>({
     queryKey: ['system-config'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('system_config')
+      const { data, error } = await supabase
+        .from<SystemConfig>('system_config')
         .select('*')
         .order('category', { ascending: true })
         .order('config_key', { ascending: true });
@@ -179,7 +210,7 @@ const Admin = () => {
       // Initialize config values state
       const values: Record<string, string> = {};
       data?.forEach((config: SystemConfig) => {
-        if (Array.isArray(config.config_value) || typeof config.config_value === 'object') {
+        if (Array.isArray(config.config_value) || (typeof config.config_value === 'object' && config.config_value !== null)) {
           values[config.config_key] = JSON.stringify(config.config_value);
         } else {
           values[config.config_key] = String(config.config_value);
@@ -197,9 +228,9 @@ const Admin = () => {
     enabled: isEngineer,
     queryFn: async () => {
       const [edgesRes, sensorsRes, eventsRes] = await Promise.all([
-        (supabase as any).from('edges').select('id,status'),
-        (supabase as any).from('sensors').select('id,type'),
-        (supabase as any).from('events').select('id,severity,state').eq('state', 'open'),
+        supabase.from<EdgeRow>('edges').select('id,status'),
+        supabase.from<SensorRow>('sensors').select('id,type'),
+        supabase.from<EventRow>('events').select('id,severity,state').eq('state', 'open'),
       ]);
 
       if (edgesRes.error) throw edgesRes.error;
@@ -210,19 +241,19 @@ const Admin = () => {
       const sensors = sensorsRes.data || [];
       const events = eventsRes.data || [];
 
-      const sensorTypes = sensors.reduce((acc: Record<string, number>, sensor: any) => {
-        const type = sensor.type || 'unknown';
+      const sensorTypes = sensors.reduce((acc: Record<string, number>, sensor) => {
+        const type = sensor.type ?? 'unknown';
         acc[type] = (acc[type] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
       return {
         totalEdges: edges.length,
-        isolatedEdges: edges.filter((edge: any) => edge.status === 'isolated').length,
+        isolatedEdges: edges.filter((edge) => edge.status === 'isolated').length,
         totalSensors: sensors.length,
         sensorTypes,
         openIncidents: events.length,
-        criticalIncidents: events.filter((event: any) => event.severity === 'critical').length,
+        criticalIncidents: events.filter((event) => event.severity === 'critical').length,
       };
     },
   });
@@ -231,8 +262,8 @@ const Admin = () => {
     queryKey: ['engineer-valves'],
     enabled: isEngineer,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('valves_pumps')
+      const { data, error } = await supabase
+        .from<ValvePump>('valves_pumps')
         .select('id,name,kind,status,setpoint,edge_id')
         .order('kind', { ascending: true })
         .order('name', { ascending: true });
@@ -243,7 +274,7 @@ const Admin = () => {
 
   // Update user role mutation
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string; newRole: string }) => {
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: RoleKey }) => {
       const { data: existingRole } = await supabase
         .from('user_roles')
         .select('*')
@@ -253,13 +284,13 @@ const Admin = () => {
       if (existingRole) {
         const { error } = await supabase
           .from('user_roles')
-          .update({ role: newRole as any })
+          .update({ role: newRole })
           .eq('user_id', userId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('user_roles')
-          .insert({ user_id: userId, role: newRole as any });
+          .insert({ user_id: userId, role: newRole });
         if (error) throw error;
       }
     },
@@ -267,7 +298,7 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success('User role updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to update role: ${error.message}`);
     },
   });
@@ -285,14 +316,14 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success('User role removed');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to remove role: ${error.message}`);
     },
   });
 
   // Add user role mutation
   const addRoleMutation = useMutation({
-    mutationFn: async ({ userId, role: userRole }: { userId: string; role: string }) => {
+    mutationFn: async ({ userId, role: userRole }: { userId: string; role: RoleKey }) => {
       const { data: existingRole } = await supabase
         .from('user_roles')
         .select('*')
@@ -302,13 +333,13 @@ const Admin = () => {
       if (existingRole) {
         const { error } = await supabase
           .from('user_roles')
-          .update({ role: userRole as any })
+          .update({ role: userRole })
           .eq('user_id', userId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('user_roles')
-          .insert({ user_id: userId, role: userRole as any });
+          .insert({ user_id: userId, role: userRole });
         if (error) throw error;
       }
     },
@@ -319,15 +350,15 @@ const Admin = () => {
       setNewUserId('');
       setNewUserRole('operator');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to assign role: ${error.message}`);
     },
   });
 
   // Update system config mutation
   const updateConfigMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: any }) => {
-      const { error } = await (supabase as any)
+    mutationFn: async ({ key, value }: { key: string; value: ConfigValue }) => {
+      const { error } = await supabase
         .from('system_config')
         .update({ 
           config_value: value,
@@ -341,20 +372,20 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ['system-config'] });
       toast.success('Configuration updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to update configuration: ${error.message}`);
     },
   });
 
   const updateValveMutation = useMutation({
-    mutationFn: async ({ id, status, setpoint }: { id: string; status?: 'open' | 'closed' | 'isolated'; setpoint?: number | null }) => {
-      const updates: Record<string, any> = {};
+    mutationFn: async ({ id, status, setpoint }: { id: string; status?: ValvePump['status']; setpoint?: number | null }) => {
+      const updates: Partial<Pick<ValvePump, 'status' | 'setpoint'>> = {};
       if (status) updates.status = status;
       if (setpoint !== undefined) updates.setpoint = setpoint;
       if (Object.keys(updates).length === 0) {
         return;
       }
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('valves_pumps')
         .update(updates)
         .eq('id', id);
@@ -364,7 +395,7 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ['engineer-valves'] });
       toast.success('Control update applied');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to update control: ${error.message}`);
     },
   });
@@ -383,7 +414,7 @@ const Admin = () => {
     onSuccess: () => {
       toast.success('Coordinated agent analysis started');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to run agents: ${error.message}`);
     },
   });
@@ -414,7 +445,7 @@ const Admin = () => {
     const value = configValues[key];
     if (value !== undefined) {
       const config = systemConfig?.find((c) => c.config_key === key);
-      let parsedValue: any = value;
+      let parsedValue: ConfigValue = value;
       if (config) {
         if (typeof config.config_value === 'number') {
           parsedValue = Number(value);
@@ -469,7 +500,7 @@ const Admin = () => {
       operator: new Set(defaultRolePermissions.operator),
     };
 
-    (Object.keys(permissionConfigKeys) as Array<'admin' | 'engineer' | 'operator'>).forEach((roleKey) => {
+    (Object.keys(permissionConfigKeys) as RoleKey[]).forEach((roleKey) => {
       const configKey = permissionConfigKeys[roleKey];
       const config = systemConfig.find((c) => c.config_key === configKey);
       if (config && Array.isArray(config.config_value)) {
@@ -493,7 +524,7 @@ const Admin = () => {
     });
   }, [valves]);
 
-  const handlePermissionToggle = (roleKey: 'admin' | 'engineer' | 'operator', permissionKey: string, allowed: boolean) => {
+  const handlePermissionToggle = (roleKey: RoleKey, permissionKey: string, allowed: boolean) => {
     if (!rolePermissions || !isAdmin) return;
     setRolePermissions((prev) => {
       if (!prev) return prev;
@@ -514,6 +545,20 @@ const Admin = () => {
 
   const thresholdConfigs = systemConfig?.filter((c: SystemConfig) => c.category === 'thresholds') || [];
   const agentConfigs = systemConfig?.filter((c: SystemConfig) => c.category === 'agent_settings') || [];
+
+  const roleCounts = useMemo(() => {
+    const counts: Record<RoleKey, number> = {
+      admin: 0,
+      engineer: 0,
+      operator: 0,
+    };
+    users?.forEach((u) => {
+      if (u.role === 'admin' || u.role === 'engineer' || u.role === 'operator') {
+        counts[u.role] += 1;
+      }
+    });
+    return counts;
+  }, [users]);
 
   if (isEngineer) {
     return (
@@ -716,20 +761,6 @@ const Admin = () => {
     return null;
   }
 
-  const roleCounts = useMemo(() => {
-    const counts: Record<'admin' | 'engineer' | 'operator', number> = {
-      admin: 0,
-      engineer: 0,
-      operator: 0,
-    };
-    users?.forEach((u) => {
-      if (u.role === 'admin' || u.role === 'engineer' || u.role === 'operator') {
-        counts[u.role] += 1;
-      }
-    });
-    return counts;
-  }, [users]);
-
   return (
     <div className="space-y-6">
       <div>
@@ -880,7 +911,7 @@ const Admin = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="role">Role</Label>
-                        <Select value={newUserRole} onValueChange={(value: any) => setNewUserRole(value)}>
+                        <Select value={newUserRole} onValueChange={(value: RoleKey) => setNewUserRole(value)}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -930,7 +961,7 @@ const Admin = () => {
                         <TableCell>
                           <Select
                             value={userData.role}
-                            onValueChange={(newRole) => handleRoleChange(userData.id, newRole)}
+                            onValueChange={(newRole: RoleKey) => handleRoleChange(userData.id, newRole)}
                             disabled={userData.id === user?.id}
                           >
                             <SelectTrigger className="w-32">

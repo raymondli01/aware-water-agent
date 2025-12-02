@@ -7,6 +7,53 @@ import { toast } from 'sonner';
 import { CheckCircle, XCircle, Brain, TrendingUp, Droplets, Gauge, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
+interface EdgeSummary {
+  id: string;
+  name: string;
+}
+
+interface IncidentMetadata {
+  edge_name?: string;
+  sensor_indicators?: {
+    acoustic?: string;
+    pressure?: string;
+    flow?: string;
+  };
+  reasoning?: string;
+  recommendation?: {
+    action?: string;
+    valves_to_close?: string[];
+    dispatch_crew?: boolean;
+  };
+  detected_by?: string;
+  impact?: string;
+  root_cause?: string;
+  [key: string]: unknown;
+}
+
+interface TimelineItem {
+  action: string;
+  actor: string;
+  timestamp: string;
+}
+
+interface IncidentEvent {
+  id: string;
+  title: string;
+  description?: string;
+  state: 'open' | 'acknowledged' | 'resolved' | string;
+  severity: string;
+  priority?: number | null;
+  detected_by?: string | null;
+  kind?: string;
+  confidence?: number | null;
+  asset_ref?: string | null;
+  asset_type?: string | null;
+  metadata?: IncidentMetadata;
+  timeline?: TimelineItem[];
+  created_at?: string;
+}
+
 const Incidents = () => {
   const queryClient = useQueryClient();
   const [expandedIncident, setExpandedIncident] = useState<string | null>(null);
@@ -22,11 +69,11 @@ const Incidents = () => {
   };
 
   // Fetch edges for name lookup
-  const { data: edges } = useQuery({
+  const { data: edges } = useQuery<EdgeSummary[]>({
     queryKey: ['edges'],
     queryFn: async () => {
       const { data } = await supabase
-        .from('edges')
+        .from<EdgeSummary>('edges')
         .select('id, name');
       return data || [];
     },
@@ -35,11 +82,11 @@ const Incidents = () => {
   // Create edge name lookup map
   const edgeNameMap = new Map(edges?.map(edge => [edge.id, edge.name]) || []);
 
-  const { data: events } = useQuery({
+  const { data: events } = useQuery<IncidentEvent[]>({
     queryKey: ['events'],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from('events')
+      const { data } = await supabase
+        .from<IncidentEvent>('events')
         .select('*')
         .order('priority', { ascending: false })  // Sort by priority (high to low)
         .order('created_at', { ascending: false });
@@ -50,7 +97,7 @@ const Incidents = () => {
   const updateEventMutation = useMutation({
     mutationFn: async ({ id, state, edgeId }: { id: string; state: 'open' | 'acknowledged' | 'resolved'; edgeId?: string }) => {
       const { data, error } = await supabase
-        .from('events')
+        .from<IncidentEvent>('events')
         .update({ state })
         .eq('id', id)
         .select()
@@ -79,7 +126,7 @@ const Incidents = () => {
       queryClient.invalidateQueries({ queryKey: ['network-topology'] });
       toast.success('Event status updated');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Failed to update event: ${error.message}`);
     },
   });
@@ -99,10 +146,10 @@ const Incidents = () => {
   };
 
   // Separate active and resolved incidents
-  const activeIncidents = events?.filter((event: any) => event.state !== 'resolved') || [];
-  const resolvedIncidents = events?.filter((event: any) => event.state === 'resolved') || [];
+  const activeIncidents = events?.filter((event) => event.state !== 'resolved') || [];
+  const resolvedIncidents = events?.filter((event) => event.state === 'resolved') || [];
 
-  const renderIncidentCard = (event: any) => {
+  const renderIncidentCard = (event: IncidentEvent) => {
     const isAIDetected = !!event.detected_by;
     const metadata = event.metadata || {};
     const isExpanded = expandedIncident === event.id;
@@ -314,7 +361,7 @@ const Incidents = () => {
             <div className="space-y-2">
               <p className="text-sm font-medium">Timeline</p>
               <div className="space-y-2 pl-4 border-l-2 border-border">
-                {Array.isArray(event.timeline) && event.timeline.map((item: any, idx: number) => (
+                {Array.isArray(event.timeline) && event.timeline.map((item: TimelineItem, idx: number) => (
                   <div key={idx} className="text-sm">
                     <p className="font-medium">{item.action}</p>
                     <p className="text-xs text-muted-foreground">
@@ -394,7 +441,7 @@ const Incidents = () => {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {activeIncidents.map((event: any) => renderIncidentCard(event))}
+            {activeIncidents.map((event) => renderIncidentCard(event))}
           </div>
         )}
       </div>
@@ -428,7 +475,7 @@ const Incidents = () => {
             {showResolvedIncidents && (
               <CardContent className="pt-0">
                 <div className="grid gap-4">
-                  {resolvedIncidents.map((event: any) => renderIncidentCard(event))}
+                  {resolvedIncidents.map((event) => renderIncidentCard(event))}
                 </div>
               </CardContent>
             )}

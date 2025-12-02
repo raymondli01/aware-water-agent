@@ -22,6 +22,30 @@ import {
 import * as c from "@/constants";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 
+type SensorType = "pressure" | "flow" | "acoustic" | string;
+
+interface SensorRow {
+  id: string;
+  type: SensorType;
+  value: number | string;
+  unit: string;
+  asset_id: string;
+  asset_type: string;
+  last_seen: string;
+  created_at?: string;
+}
+
+interface EdgeSummary {
+  id: string;
+  name: string;
+}
+
+interface EdgeSensors {
+  id: string;
+  name: string;
+  sensors: SensorRow[];
+}
+
 const SensorData = () => {
   const queryClient = useQueryClient();
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -39,7 +63,7 @@ const SensorData = () => {
       queryClient.invalidateQueries({ queryKey: ["sensors-raw"] });
       toast.success("Sensors refreshed successfully");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error(`Failed to refresh: ${error.message}`);
     },
   });
@@ -59,17 +83,17 @@ const SensorData = () => {
       queryClient.invalidateQueries({ queryKey: ["sensors-raw"] });
       toast.success("Leak simulated! Sensors updated to critical levels.");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error(`Failed to simulate leak: ${error.message}`);
     },
   });
 
   // Data Fetching
-  const { data: sensors, isLoading: isLoadingSensors } = useQuery({
+  const { data: sensors, isLoading: isLoadingSensors } = useQuery<SensorRow[]>({
     queryKey: ["sensors-raw"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("sensors")
+        .from<SensorRow>("sensors")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -79,10 +103,10 @@ const SensorData = () => {
     refetchInterval: 5000,
   });
 
-  const { data: edgesData, isLoading: isLoadingEdges } = useQuery({
+  const { data: edgesData, isLoading: isLoadingEdges } = useQuery<EdgeSummary[]>({
     queryKey: ["edges"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("edges").select("id, name");
+      const { data, error } = await supabase.from<EdgeSummary>("edges").select("id, name");
 
       if (error) throw error;
       return data;
@@ -97,7 +121,7 @@ const SensorData = () => {
   );
 
   // Group sensors by edge and keep latest reading per type
-  const sensorsByEdge = sensors?.reduce((acc: any, sensor: any) => {
+  const sensorsByEdge = sensors?.reduce<Record<string, EdgeSensors>>((acc, sensor) => {
     if (sensor.asset_type === "edge") {
       const edgeId = sensor.asset_id;
       if (!acc[edgeId]) {
@@ -108,7 +132,7 @@ const SensorData = () => {
         };
       }
       const existingTypeIndex = acc[edgeId].sensors.findIndex(
-        (s: any) => s.type === sensor.type
+        (s) => s.type === sensor.type
       );
       if (existingTypeIndex === -1) {
         acc[edgeId].sensors.push(sensor);
@@ -118,11 +142,11 @@ const SensorData = () => {
   }, {});
 
   const sortedGroups = Object.values(sensorsByEdge || {}).sort(
-    (a: any, b: any) =>
+    (a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true })
   );
 
-  const edges = sortedGroups;
+  const edges: EdgeSensors[] = sortedGroups;
 
   // Sensor Card Theme Selection
   const getSensorTheme = (type: string, value: number) => {
@@ -168,11 +192,12 @@ const SensorData = () => {
   };
 
   // Renders sensor cell for a given type
-  const renderSensorCell = (edgeSensors: any[], type: string) => {
+  const renderSensorCell = (edgeSensors: SensorRow[], type: SensorType) => {
     const sensor = edgeSensors.find((s) => s.type === type);
     if (!sensor) return <span className="text-muted-foreground">-</span>;
 
-    const theme = getSensorTheme(type, sensor.value);
+    const sensorValue = typeof sensor.value === "number" ? sensor.value : Number(sensor.value);
+    const theme = getSensorTheme(type, sensorValue);
     const Icon =
       type === "pressure"
         ? Gauge
@@ -248,10 +273,10 @@ const SensorData = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(edges as any[]).map((edge: any) => {
+              {edges.map((edge) => {
                 // Find most recent update time across sensors for this edge
                 const lastUpdate = edge.sensors.reduce(
-                  (latest: number, sensor: any) => {
+                  (latest: number, sensor: SensorRow) => {
                     const sensorTime = new Date(sensor.last_seen).getTime();
                     return sensorTime > latest ? sensorTime : latest;
                   },

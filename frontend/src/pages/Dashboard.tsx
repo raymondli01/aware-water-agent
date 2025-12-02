@@ -5,12 +5,45 @@ import { Badge } from '@/components/ui/badge';
 import { Activity, AlertTriangle, Droplets, Zap, TrendingUp } from 'lucide-react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+interface EventEntry {
+  id: string;
+  title: string;
+  created_at: string;
+  state: string;
+  severity: string;
+}
+
+interface AgentEntry {
+  id: string;
+  name: string;
+  status: string;
+  confidence?: number | null;
+  last_decision?: string | null;
+}
+
+interface AnalyticsRow {
+  metric_name: string;
+  metric_value: Record<string, number | string | boolean | null> | number | string | boolean | null;
+}
+
+type AnalyticsMap = Record<string, Record<string, number | string | boolean | null> | number | string | boolean | null>;
+
+interface DemandForecastRow {
+  hour: number;
+  predicted_demand: number;
+}
+
+interface DemandForecastPoint {
+  hour: number;
+  demand: number;
+}
+
 const Dashboard = () => {
-  const { data: events } = useQuery({
+  const { data: events } = useQuery<EventEntry[]>({
     queryKey: ['events'],
     queryFn: async () => {
       const { data } = await supabase
-        .from('events')
+        .from<EventEntry>('events')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -18,27 +51,27 @@ const Dashboard = () => {
     },
   });
 
-  const { data: agents } = useQuery({
+  const { data: agents } = useQuery<AgentEntry[]>({
     queryKey: ['agents'],
     queryFn: async () => {
-      const { data } = await supabase.from('agents').select('*');
+      const { data } = await supabase.from<AgentEntry>('agents').select('*');
       return data || [];
     },
   });
 
   // Fetch AI-generated analytics
-  const { data: analytics } = useQuery({
+  const { data: analytics } = useQuery<AnalyticsMap>({
     queryKey: ['ai_analytics'],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from('ai_analytics')
+      const { data } = await supabase
+        .from<AnalyticsRow>('ai_analytics')
         .select('*')
         .order('calculated_at', { ascending: false })
         .limit(10);
 
       // Convert to easy-to-use object
-      const analyticsMap: Record<string, any> = {};
-      data?.forEach((item: any) => {
+      const analyticsMap: AnalyticsMap = {};
+      data?.forEach((item) => {
         analyticsMap[item.metric_name] = item.metric_value;
       });
       return analyticsMap;
@@ -46,15 +79,15 @@ const Dashboard = () => {
   });
 
   // Fetch demand forecast
-  const { data: demandForecast } = useQuery({
+  const { data: demandForecast } = useQuery<DemandForecastPoint[]>({
     queryKey: ['demand_forecasts'],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from('demand_forecasts')
+      const { data } = await supabase
+        .from<DemandForecastRow>('demand_forecasts')
         .select('*')
         .order('hour', { ascending: true })
         .limit(24);
-      return data?.map((d: any) => ({ hour: d.hour, demand: d.predicted_demand })) || [];
+      return data?.map((d) => ({ hour: d.hour, demand: d.predicted_demand })) || [];
     },
   });
 

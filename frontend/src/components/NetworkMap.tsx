@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Circle, Map as LeafletMap, Polyline } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface Node {
@@ -31,7 +32,9 @@ interface NetworkMapProps {
   viewMode?: "status" | "material" | "age";
 }
 
-let Leaflet: any = null;
+type LeafletModule = typeof import("leaflet");
+
+let Leaflet: LeafletModule | null = null;
 
 const NetworkMap = ({
   center,
@@ -42,11 +45,11 @@ const NetworkMap = ({
   getEdgeColor,
   viewMode = "status",
 }: NetworkMapProps) => {
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<Map<string, any>>(new Map());
-  const polylinesRef = useRef<Map<string, any>>(new Map());
-  const [L, setL] = useState<any>(null);
+  const markersRef = useRef<Map<string, Circle>>(new Map());
+  const polylinesRef = useRef<Map<string, Polyline>>(new Map());
+  const [L, setL] = useState<LeafletModule | null>(null);
 
   // Load Leaflet dynamically on client side
   useEffect(() => {
@@ -155,9 +158,8 @@ const NetworkMap = ({
       if (!from || !to) return;
 
       const color = getEdgeColor(edge);
-      const edgeData = edge as any;
       const dashArray =
-        edge.status === "isolated" || edgeData.has_acknowledged_incidents
+        edge.status === "isolated" || edge.has_acknowledged_incidents
           ? "10, 10"
           : undefined;
 

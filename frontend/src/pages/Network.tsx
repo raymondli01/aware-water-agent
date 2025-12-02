@@ -28,12 +28,20 @@ interface Edge {
   status: string;
   from_node_id: string;
   to_node_id: string;
-  active_incident_count?: number;
-  highest_priority_incident?: any;
+  active_incident_count?: number | null;
+  highest_priority_incident?: {
+    severity?: string;
+    status?: string;
+  } | null;
   has_open_incidents?: boolean;
   has_acknowledged_incidents?: boolean;
   material?: string;
   installation_date?: string;
+}
+
+interface NetworkTopology {
+  nodes: Node[];
+  edges: Edge[];
 }
 
 // State Initialization
@@ -47,12 +55,12 @@ const Network = () => {
 
   // Data Fetching
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const { data: topology } = useQuery({
+  const { data: topology } = useQuery<NetworkTopology>({
     queryKey: ["network-topology"],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/network/topology`);
       const data = await response.json();
-      return data;
+      return data as NetworkTopology;
     },
     refetchInterval: 30000,
   });
@@ -123,17 +131,16 @@ const Network = () => {
       return "#22c55e";
     }
 
-    const edgeData = edge as any;
-    if (edgeData.has_acknowledged_incidents || edgeData.has_open_incidents) {
+    if (edge.has_acknowledged_incidents || edge.has_open_incidents) {
       return "#dc2626";
     }
-    if (edgeData.active_incident_count === 0) {
+    if (edge.active_incident_count === 0) {
       return "#0ea5e9";
     }
-    if (edgeData.status === "critical") return "#dc2626";
-    if (edgeData.status === "high") return "#ea580c";
-    if (edgeData.status === "medium") return "#ca8a04";
-    if (edgeData.status === "low") return "#65a30d";
+    if (edge.status === "critical") return "#dc2626";
+    if (edge.status === "high") return "#ea580c";
+    if (edge.status === "medium") return "#ca8a04";
+    if (edge.status === "low") return "#65a30d";
 
     return "#0ea5e9";
   };
@@ -159,7 +166,7 @@ const Network = () => {
           </div>
           <Tabs
             value={viewMode}
-            onValueChange={(v) => setViewMode(v as any)}
+            onValueChange={(v: "status" | "material" | "age") => setViewMode(v)}
             className="w-[400px]"
           >
             <TabsList className="grid w-full grid-cols-3">
