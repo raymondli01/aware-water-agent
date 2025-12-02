@@ -104,7 +104,8 @@ const Network = () => {
   // Utility: Get Node Position
   const getNodePosition = (nodeId: string): [number, number] | null => {
     const node = nodes?.find((n) => n.id === nodeId);
-    return node ? [node.x, node.y] : null;
+    // Leaflet expects [lat, lon]; data stores x=lon, y=lat
+    return node ? [node.y, node.x] : null;
   };
 
   // Utility: Determine Edge Color Based on View Mode and Status
@@ -131,12 +132,7 @@ const Network = () => {
       return "#22c55e";
     }
 
-    if (edge.has_acknowledged_incidents || edge.has_open_incidents) {
-      return "#dc2626";
-    }
-    if (edge.active_incident_count === 0) {
-      return "#0ea5e9";
-    }
+    // In status view mode, prioritize sensor-based status over incidents
     if (edge.status === "critical") return "#dc2626";
     if (edge.status === "high") return "#ea580c";
     if (edge.status === "medium") return "#ca8a04";

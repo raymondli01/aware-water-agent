@@ -77,3 +77,4 @@ run_migration.sh
 # Build artifacts
 # ============================================
 bun.lockb
+scripts/

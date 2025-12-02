@@ -112,7 +112,8 @@ const NetworkMap = ({
           ? "#0ea5e9"
           : "#f59e0b";
 
-      const circle = L.circle([node.x, node.y], {
+      // Leaflet wants [lat, lon]; our data stores x=lon, y=lat
+      const circle = L.circle([node.y, node.x], {
         radius: 20,
         fillColor: color,
         fillOpacity: 0.8,
@@ -152,12 +153,22 @@ const NetworkMap = ({
     });
     polylinesRef.current.clear();
 
-    edges.forEach((edge) => {
+    // Sort edges: render normal/low priority first, then critical/high last (so they appear on top)
+    const sortedEdges = [...edges].sort((a, b) => {
+      const priorityOrder = { normal: 0, low: 1, medium: 2, high: 3, critical: 4, isolated: 5 };
+      const aPriority = priorityOrder[a.status as keyof typeof priorityOrder] || 0;
+      const bPriority = priorityOrder[b.status as keyof typeof priorityOrder] || 0;
+      return aPriority - bPriority;
+    });
+
+    sortedEdges.forEach((edge) => {
       const from = getNodePosition(edge.from_node_id);
       const to = getNodePosition(edge.to_node_id);
+
       if (!from || !to) return;
 
       const color = getEdgeColor(edge);
+
       const dashArray =
         edge.status === "isolated" || edge.has_acknowledged_incidents
           ? "10, 10"
