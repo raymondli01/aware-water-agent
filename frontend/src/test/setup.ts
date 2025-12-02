@@ -25,7 +25,7 @@ global.IntersectionObserver = class IntersectionObserver {
     return []
   }
   unobserve() {}
-} as any
+} as unknown as typeof IntersectionObserver
 
 // Mock ResizeObserver (required for some chart components)
 global.ResizeObserver = class ResizeObserver {
@@ -33,7 +33,7 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
   observe() {}
   unobserve() {}
-} as any
+} as unknown as typeof ResizeObserver
 
 // Mock Supabase client
 vi.mock('@/lib/supabase', () => ({
