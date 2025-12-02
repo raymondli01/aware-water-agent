@@ -190,7 +190,7 @@ if [ -z "$LISTENER_ARN" ] || [ "$LISTENER_ARN" == "None" ]; then
     aws elbv2 create-rule \
         --listener-arn ${LISTENER_ARN} \
         --priority 200 \
-        --conditions Field=path-pattern,Values='/sensors','/leaks','/ai/*','/network/*' \
+        --conditions Field=path-pattern,Values='/sensors*','/leaks*','/ai/*','/network/*' \
         --actions Type=forward,TargetGroupArn=${BACKEND_TG_ARN} \
         --region ${AWS_REGION} > /dev/null 2>&1 || echo "Rule may already exist"
     
