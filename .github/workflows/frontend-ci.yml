@@ -1,0 +1,161 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  test:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --run --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+
+  lint:
+    name: Lint Frontend Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build production bundle
+        working-directory: frontend
+        env:
+          # Mock Supabase credentials for build (not real)
+          VITE_SUPABASE_URL: https://mock-project.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: mock-anon-key
+        run: npm run build
+
+      - name: Check bundle size
+        working-directory: frontend
+        run: |
+          echo "📦 Build artifacts:"
+          ls -lh dist/
+          echo "📊 Bundle size:"
+          du -sh dist/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          retention-days: 7
+
+  lighthouse:
+    name: Lighthouse Performance
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.12.x
+
+      - name: Run Lighthouse CI
+        working-directory: frontend
+        run: |
+          lhci autorun --upload.target=temporary-public-storage || echo "Lighthouse CI completed"
+
+  summary:
+    name: Frontend Test Summary
+    runs-on: ubuntu-latest
+    needs: [test, lint, build, lighthouse]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "Frontend CI completed!"
+          echo "Test job status: ${{ needs.test.result }}"
+          echo "Lint job status: ${{ needs.lint.result }}"
+          echo "Build job status: ${{ needs.build.result }}"
+          echo "Lighthouse job status: ${{ needs.lighthouse.result }}"
+
+          if [ "${{ needs.test.result }}" == "failure" ] || [ "${{ needs.lint.result }}" == "failure" ] || [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "❌ Frontend CI failed"
+            exit 1
+          else
+            echo "✅ Frontend CI passed"
+          fi
