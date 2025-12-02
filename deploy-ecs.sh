@@ -185,12 +185,20 @@ if [ -z "$LISTENER_ARN" ] || [ "$LISTENER_ARN" == "None" ]; then
         --conditions Field=path-pattern,Values='/api/*' \
         --actions Type=forward,TargetGroupArn=${BACKEND_TG_ARN} \
         --region ${AWS_REGION} > /dev/null 2>&1 || echo "Rule may already exist"
-    
-    # Add rule for backend root paths
+
+    # Add rule for backend root paths with wildcards (to match subpaths like /sensors/refresh)
     aws elbv2 create-rule \
         --listener-arn ${LISTENER_ARN} \
         --priority 200 \
-        --conditions Field=path-pattern,Values='/sensors*','/leaks*','/ai/*','/network/*' \
+        --conditions Field=path-pattern,Values='/sensors/*','/leaks/*','/ai/*','/network/*' \
+        --actions Type=forward,TargetGroupArn=${BACKEND_TG_ARN} \
+        --region ${AWS_REGION} > /dev/null 2>&1 || echo "Rule may already exist"
+
+    # Add rule for exact backend root paths (to match /sensors and /leaks exactly)
+    aws elbv2 create-rule \
+        --listener-arn ${LISTENER_ARN} \
+        --priority 201 \
+        --conditions Field=path-pattern,Values='/sensors','/leaks' \
         --actions Type=forward,TargetGroupArn=${BACKEND_TG_ARN} \
         --region ${AWS_REGION} > /dev/null 2>&1 || echo "Rule may already exist"
     
