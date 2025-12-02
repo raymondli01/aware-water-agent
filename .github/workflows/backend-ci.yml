@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'deploy-ecs.sh'
+      - 'aws-setup.sh'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'deploy-ecs.sh'
+      - 'aws-setup.sh'
       - '.github/workflows/backend-ci.yml'
 
 jobs:

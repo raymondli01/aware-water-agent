@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - 'deploy-ecs.sh'
+      - 'aws-setup.sh'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'frontend/**'
+      - 'deploy-ecs.sh'
+      - 'aws-setup.sh'
       - '.github/workflows/frontend-ci.yml'
 
 jobs:
