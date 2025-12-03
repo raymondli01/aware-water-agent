@@ -791,7 +791,7 @@ Copyright © 2025 Team A.W.A.R.E. - San José State University
 
 ## Project Links
 
-- **🔗 GitHub Repository**: [github.com/raymondli01/aware-water-agent](https://github.com/raymondli01/aware-water-agent)
+- **🔗 GitHub Repository**: [github.com/raymondli01/AWARE](https://github.com/raymondli01/AWARE)
 - **🌐 Live Demo**: [AWARE Water Management System](http://aware-water-alb-1723674360.us-west-1.elb.amazonaws.com/)
 - **📄 Design Report**: [AWARE_CMPE272_Design_Thinking_Report.pdf](./AWARE_CMPE272_Design_Thinking_Report.pdf)
 - **📄 Project Report**: [AWARE_CMPE272_Project_Report.pdf](./AWARE_CMPE272_Project_Report.pdf)
